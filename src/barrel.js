@@ -73,10 +73,11 @@ class BarrelFilesMapping {
         const originalExportedPath = node.source?.value || fullPathModule;
         const absoluteExportedPath = node.source?.value ? PathFunctions.getModuleFile(fullPathModule, originalExportedPath) : fullPathModule;
         node.specifiers.forEach((specifier) => {
-          const specifierName = specifier.exported.name;
+          const specifierExportedName = specifier.exported.name;
+          const specifierLocalName = specifier?.local?.name;
           const specifierType = AST.getSpecifierType(specifier);
-          this.mapping[fullPathModule][specifierName] =
-            this.createDirectSpecifierObject(absoluteExportedPath, specifierName, specifierType);
+          this.mapping[fullPathModule][specifierExportedName] =
+            this.createDirectSpecifierObject(absoluteExportedPath, specifierExportedName, specifierLocalName, specifierType);
         });
         if (t.isVariableDeclaration(node.declaration)) {
           const specifierType = "named";
@@ -102,28 +103,30 @@ class BarrelFilesMapping {
     });
   }
 
-  createDirectSpecifierObject(fullPathModule, specifierName, specifierType) {
+  createDirectSpecifierObject(fullPathModule, specifierExportedName, specifierLocalName, specifierType) {
     if (BarrelFilesMapping.isBarrelFile(fullPathModule)) {
       if (!this.mapping[fullPathModule]) {
         this.createSpecifiersMapping(fullPathModule);
       }
-      const originalPath = this.mapping[fullPathModule][specifierName]["path"];
-      const originalName = this.mapping[fullPathModule][specifierName]["name"];
-      const originalType = this.mapping[fullPathModule][specifierName]["type"];
-      return this.createDirectSpecifierObject(originalPath, originalName, originalType);
+      const originalPath = this.mapping[fullPathModule][specifierExportedName]["path"];
+      const originalExportedName = this.mapping[fullPathModule][specifierExportedName]["exportedName"];
+      const originalLocalName = this.mapping[fullPathModule][specifierExportedName]["localName"];
+      const originalType = this.mapping[fullPathModule][specifierExportedName]["type"];
+      return this.createDirectSpecifierObject(originalPath, originalExportedName, originalLocalName, originalType);
     }
     return {
-      name: specifierName,
+      exportedName: specifierExportedName,
+      localName: specifierLocalName,
       path: fullPathModule,
       type: specifierType,
     };
   }
 
-  getDirectSpecifierObject(fullPathModule, specifierName) {
+  getDirectSpecifierObject(fullPathModule, specifierExportedName) {
     if (!this.mapping[fullPathModule]) {
       this.createSpecifiersMapping(fullPathModule);
     }
-    return this.mapping[fullPathModule][specifierName];
+    return this.mapping[fullPathModule][specifierExportedName];
   }
 }
 
