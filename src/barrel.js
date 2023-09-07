@@ -20,10 +20,16 @@ class PathFunctions {
     return importModulePath.match(/\.(js|mjs|jsx|ts|tsx)$/);
   }
   
-  static getBaseUrlFromTsconfig() {
+  static getBaseUrlFromJTsconfig() {
     try {
-      const filename = ospath.resolve("jsconfig.json");
-      const content = JSON.parse(fs.readFileSync(filename, "utf-8"));
+      let content;
+      const jsconfig = ospath.resolve("jsconfig.json");
+      const tsconfig = ospath.resolve("tsconfig.json");
+      if (fs.existsSync(jsconfig)) {
+        content = JSON.parse(fs.readFileSync(jsconfig, "utf-8"));
+      } else if (fs.existsSync(tsconfig)) {
+        content = JSON.parse(fs.readFileSync(tsconfig, "utf-8"));
+      }
       return content?.["compilerOptions"]?.["baseUrl"] || "./";
     } catch (error) {
       throw error;
@@ -39,7 +45,7 @@ class PathFunctions {
     try {
       const filenameDir = ospath.dirname(filenameImportFrom);
       const basePath = PathFunctions.isRelativePath(modulePath) ? 
-        filenameDir : ospath.resolve(PathFunctions.getBaseUrlFromTsconfig());
+        filenameDir : ospath.resolve(PathFunctions.getBaseUrlFromJTsconfig());
       return require.resolve(ospath.resolve(basePath, modulePath));  
     } catch {
       try {
