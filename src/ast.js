@@ -19,15 +19,15 @@ class AST {
       } else return "named";
     }
 
-    static createASTImportDeclaration = ({exportedName: specifierLocalName, localName: specifierImportedName, path: modulePath, type: specifierType}) => {
+    static createASTImportDeclaration = ({localName, importedName, path, type}) => {
       return t.importDeclaration(
         [
-          specifierType === "named"
-            ? t.importSpecifier(t.identifier(specifierLocalName),t.identifier(specifierImportedName))
-            : t.importDefaultSpecifier(t.identifier(specifierLocalName))
+          type === "named"
+            ? t.importSpecifier(t.identifier(localName),t.identifier(importedName))
+            : t.importDefaultSpecifier(t.identifier(localName))
           ,
         ],
-        t.stringLiteral(modulePath)
+        t.stringLiteral(path)
       )
     }  
   }

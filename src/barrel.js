@@ -151,7 +151,13 @@ const importDeclarationVisitor = (path, state) => {
         importModuleAbsolutePath,
         specifier.imported.name
       );
-      return AST.createASTImportDeclaration(directSpecifierObject);
+      const newImportProperties = {
+        localName: specifier.local.name,
+        importedName: directSpecifierObject["localName"],
+        path: directSpecifierObject["path"],
+        type: directSpecifierObject["type"],
+      }
+      return AST.createASTImportDeclaration(newImportProperties);
     }
   );
   path.replaceWithMultiple(directSpecifierASTArray);
