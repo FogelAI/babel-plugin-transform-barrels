@@ -30,13 +30,13 @@ import { List } from './components/List/List'
 
 2. Add the following to your webpack config file in the rule with a `babel-loader` loader:
 
-    ```json
-    "plugins": ["transform-barrels"]
+    ```javascript
+    "plugins": ["transform-barrels", { webpackConfigFilename: __filename, ...(typeof module.exports === "function" && { args: arguments })}]
     ```
 
    Alternatively, you can add `babel-plugin-transform-barrels` to your babelrc file:
 
-    ```json
+    ```javascript
     "plugins": ["babel-plugin-transform-barrels"]
     ```
 
@@ -47,7 +47,7 @@ There are two issues that can occur in bundle files created by Webpack when usin
 2. Unused Javascript code in Javascript bundle files when using dynamic imports - this occurs when a barrel file is imported inside two different dynamically imported modules. This barrel file and its re-exported modules will be included twice in the two bundle files.
 
 ### Note
-I recommend reading my article *Potential issues with barrel files in Webpack* for more information on possible issues can caused by barrel files.
+I recommend reading my article [*Potential issues with barrel files in Webpack*](https://dev.to/fogel/potential-issues-with-barrel-files-in-webpack-4bf2) for more information on possible issues can caused by barrel files.
 
 ## Possible Solutions
 

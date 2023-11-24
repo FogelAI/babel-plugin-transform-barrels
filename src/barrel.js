@@ -4,59 +4,109 @@ const fs = require("fs");
 const AST = require("./ast");
 
 class PathFunctions {
+  static isObjectEmpty(obj) {
+    if (typeof obj === 'object' && Object.keys(obj).length !== 0) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
   static isRelativePath(path) {
     return path.match(/^\.{0,2}\//);
   }
   
-  static isLocalModule(importModulePath) {
-    try {
-      return !!require.resolve(importModulePath) && !importModulePath.includes("node_modules");
-    } catch {
-      return false;
-    }
+  static checkIfModule(path) {
+    const notModuleRegExp = /^\.$|^\.[\\\/]|^\.\.$|^\.\.[\/\\]|^\/|^[A-Z]:[\\\/]/i;
+    const isModuleVar = !notModuleRegExp.test(path) || path.includes("node_modules");
+    return isModuleVar;
   }
-  
-  static isScriptFile(importModulePath) {
-    return importModulePath.match(/\.(js|mjs|jsx|ts|tsx)$/);
-  }
-  
-  static getBaseUrlFromJTsconfig() {
-    try {
-      let content;
-      const jsconfig = ospath.resolve("jsconfig.json");
-      const tsconfig = ospath.resolve("tsconfig.json");
-      if (fs.existsSync(jsconfig)) {
-        content = JSON.parse(fs.readFileSync(jsconfig, "utf-8"));
-      } else if (fs.existsSync(tsconfig)) {
-        content = JSON.parse(fs.readFileSync(tsconfig, "utf-8"));
-      }
-      return content?.["compilerOptions"]?.["baseUrl"] || "./";
-    } catch (error) {
-      throw error;
+
+  static getModuleAbsolutePath(parsedJSFile, convertedImportsPath) {
+    // solution for require function for ES modules
+    // https://stackoverflow.com/questions/54977743/do-require-resolve-for-es-modules
+    // https://stackoverflow.com/a/50053801
+    // import { createRequire } from "module";
+    // const require = createRequire(import.meta.url);
+    let absolutePath = convertedImportsPath;
+    if (!ospath.isAbsolute(convertedImportsPath)) {
+      absolutePath = ospath.join(ospath.dirname(parsedJSFile), convertedImportsPath);
     }
+    const resolvedAbsolutePath = require.resolve(absolutePath);
+    return resolvedAbsolutePath;
   }
-  
-  static getModuleFile(filenameImportFrom, modulePath) {
-  // solution for require function for ES modules
-  // https://stackoverflow.com/questions/54977743/do-require-resolve-for-es-modules
-  // https://stackoverflow.com/a/50053801
-  // import { createRequire } from "module";
-  // const require = createRequire(import.meta.url);
-    try {
-      const filenameDir = ospath.dirname(filenameImportFrom);
-      const basePath = PathFunctions.isRelativePath(modulePath) ? 
-        filenameDir : ospath.resolve(PathFunctions.getBaseUrlFromJTsconfig());
-      return require.resolve(ospath.resolve(basePath, modulePath));  
-    } catch {
-      try {
-        return require.resolve(modulePath);
-      } catch {
-        return "MODULE_NOT_FOUND";
-      }
-    }
-  }  
 }
 
+class WebpackConfig {
+  constructor() {
+    this.aliasObj = {};
+  }
+
+  getWebpackAlias(plugin) {
+    const filePath = plugin.options.webpackConfigFilename;
+    // If the config comes back as null, we didn't find it, so throw an exception.
+    if (!filePath) {
+      return null;
+    }
+    const webpackConfigObj = require(filePath);
+  
+    let alias = {};
+    if (typeof webpackConfigObj === 'object') {
+      if (!PathFunctions.isObjectEmpty(webpackConfigObj?.resolve?.alias)) {
+        alias = webpackConfigObj.resolve.alias;
+      }
+    } else if (typeof webpackConfigObj === 'function') {
+      const args = plugin.options.args || [];
+      alias = webpackConfigObj(...args).resolve.alias;
+    }
+    this.aliasObj = alias;
+    return alias;
+  }  
+
+  convertAliasToOriginal(parsedJSFile, originalImportsPath) {
+    let convertedPath = originalImportsPath;
+    const aliasObj = this.aliasObj;
+    const aliases = Object.keys(aliasObj);
+    for (const alias of aliases) {
+      let aliasDestination = aliasObj[alias];
+      const regex = new RegExp(`^${alias}(\/|$)`);
+      
+      if (regex.test(originalImportsPath)) {
+        const isModule = PathFunctions.checkIfModule(aliasDestination);
+        if (isModule) {
+          convertedPath = aliasDestination;
+          break;
+        }
+        // If the filepath is not absolute, make it absolute
+        if (!ospath.isAbsolute(aliasDestination)) {
+            aliasDestination = ospath.join(ospath.dirname(parsedJSFile), aliasDestination);
+        }
+        let relativeFilePath = ospath.relative(ospath.dirname(parsedJSFile), aliasDestination);
+  
+        // In case the file path is the root of the alias, need to put a dot to avoid having an absolute path
+        if (relativeFilePath.length === 0) {
+            relativeFilePath = '.';
+        }
+  
+        let requiredFilePath = originalImportsPath.replace(alias, relativeFilePath);
+  
+        // If the file is requiring the current directory which is the alias, add an extra slash
+        if (requiredFilePath === '.') {
+            requiredFilePath = './';
+        }
+  
+        // In the case of a file requiring a child directory of the current directory, we need to add a dot slash
+        if (['.', '/'].indexOf(requiredFilePath[0]) === -1) {
+            requiredFilePath = `./${requiredFilePath}`;
+        }
+  
+        convertedPath = requiredFilePath;
+        break;
+      }
+    }
+    return convertedPath;
+  }  
+}
 
 class BarrelFilesMapping {
   constructor() {
@@ -67,17 +117,14 @@ class BarrelFilesMapping {
     return modulePath.endsWith("index.js");
   }
 
-  verifyFilePath (importModuleAbsolutePath) {
-    return !BarrelFilesMapping.isBarrelFile(importModuleAbsolutePath) || !PathFunctions.isLocalModule(importModuleAbsolutePath) || !PathFunctions.isScriptFile(importModuleAbsolutePath)
-  }  
-
   createSpecifiersMapping(fullPathModule) {
     const barrelAST = AST.filenameToAST(fullPathModule);
     this.mapping[fullPathModule] = {};
     barrelAST.program.body.forEach((node) => {
       if (t.isExportNamedDeclaration(node)) {
         const originalExportedPath = node.source?.value || fullPathModule;
-        const absoluteExportedPath = node.source?.value ? PathFunctions.getModuleFile(fullPathModule, originalExportedPath) : fullPathModule;
+        const convertedExportedPath = webpackConfig.convertAliasToOriginal(fullPathModule, originalExportedPath);
+        const absoluteExportedPath = PathFunctions.getModuleAbsolutePath(fullPathModule, convertedExportedPath);
         node.specifiers.forEach((specifier) => {
           const specifierExportedName = specifier.exported.name;
           const specifierLocalName = specifier?.local?.name;
@@ -100,7 +147,8 @@ class BarrelFilesMapping {
         }
       } else if (t.isExportAllDeclaration(node)) {
         const originalExportedPath = node.source.value;
-        const absoluteExportedPath = PathFunctions.getModuleFile(fullPathModule, originalExportedPath);
+        const convertedExportedPath = webpackConfig.convertAliasToOriginal(fullPathModule, originalExportedPath);
+        const absoluteExportedPath = PathFunctions.getModuleAbsolutePath(fullPathModule, convertedExportedPath);
         if (!this.mapping[absoluteExportedPath]) {
           this.createSpecifiersMapping(absoluteExportedPath);
         }
@@ -137,14 +185,16 @@ class BarrelFilesMapping {
 }
 
 const mapping = new BarrelFilesMapping();
+const webpackConfig = new WebpackConfig();
 
 const importDeclarationVisitor = (path, state) => {
   const parsedJSFile = state.filename
   const originalImportsPath = path.node.source.value;
   const originalImportsSpecifiers = path.node.specifiers;
-  // const importModulePath = resolve.sync(originalImports.source.value,{basedir: ospath.dirname(state.filename)});
-  const importModuleAbsolutePath = PathFunctions.getModuleFile(parsedJSFile, originalImportsPath);
-  if (mapping.verifyFilePath(importModuleAbsolutePath)) return;
+  const convertedImportsPath = webpackConfig.convertAliasToOriginal(parsedJSFile, originalImportsPath);
+  if (PathFunctions.checkIfModule(convertedImportsPath)) return;
+  const importModuleAbsolutePath = PathFunctions.getModuleAbsolutePath(parsedJSFile, convertedImportsPath);
+  if (!BarrelFilesMapping.isBarrelFile(importModuleAbsolutePath)) return;
   const directSpecifierASTArray = originalImportsSpecifiers.map(
     (specifier) => {
       const directSpecifierObject = mapping.getDirectSpecifierObject(
@@ -164,7 +214,14 @@ const importDeclarationVisitor = (path, state) => {
 };
 
 module.exports = function (babel) {
+  const PLUGIN_KEY = 'transform-barrels';
   return {
+    name: PLUGIN_KEY,
+    pre(state) {
+      const plugins = state.opts.plugins;
+      const plugin = plugins.find(plugin => plugin.key === PLUGIN_KEY);
+      webpackConfig.getWebpackAlias(plugin);
+    },
     visitor: {
       ImportDeclaration: importDeclarationVisitor,
     },
