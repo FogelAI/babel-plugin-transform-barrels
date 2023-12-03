@@ -12,6 +12,14 @@ class PathFunctions {
     }
   }
 
+  static fileExists(path) {
+    try {
+        return !fs.accessSync(path, fs.F_OK);
+    } catch (e) {
+        return false;
+    }
+  }
+
   static isRelativePath(path) {
     return path.match(/^\.{0,2}\//);
   }
@@ -23,17 +31,14 @@ class PathFunctions {
   }
 
   static getModuleAbsolutePath(parsedJSFile, convertedImportsPath) {
-    // solution for require function for ES modules
-    // https://stackoverflow.com/questions/54977743/do-require-resolve-for-es-modules
-    // https://stackoverflow.com/a/50053801
-    // import { createRequire } from "module";
-    // const require = createRequire(import.meta.url);
     let absolutePath = convertedImportsPath;
     if (!ospath.isAbsolute(convertedImportsPath)) {
       absolutePath = ospath.join(ospath.dirname(parsedJSFile), convertedImportsPath);
     }
-    const resolvedAbsolutePath = require.resolve(absolutePath);
-    return resolvedAbsolutePath;
+    const ext = ['.js','.jsx','.ts','.tsx', '/index.js','/index.jsx','/index.ts','/index.tsx'].find((ext)=> PathFunctions.fileExists(absolutePath + ext)) || "";
+    absolutePath = absolutePath + ext;
+    // const resolvedAbsolutePath = require.resolve(absolutePath);
+    return absolutePath;
   }
 }
 
@@ -114,7 +119,8 @@ class BarrelFilesMapping {
   }
 
   static isBarrelFile(modulePath) {
-    return modulePath.endsWith("index.js");
+    const barrelFileRegex = new RegExp(`index\.(js|mjs|jsx|ts|tsx)$`);
+    return barrelFileRegex.test(modulePath);
   }
 
   createSpecifiersMapping(fullPathModule) {
