@@ -1,6 +1,7 @@
 const t = require("@babel/types");
 const ospath = require("path");
 const fs = require("fs");
+const fg = require("fast-glob");
 const AST = require("./ast");
 
 class PathFunctions {
@@ -39,6 +40,54 @@ class PathFunctions {
     absolutePath = absolutePath + ext;
     // const resolvedAbsolutePath = require.resolve(absolutePath);
     return absolutePath;
+  }
+}
+
+class PackageJson {
+  constructor() {
+    this.mainPkg = ospath.resolve('package.json');
+    this.packagesJsons = [];
+    this.aliasObj = {};
+    this.workspaces = this.loadWorkspaces();
+    this.getNodePackages();
+    this.aliasesToWorkspaces();
+  }
+
+  loadWorkspaces() {
+    const workspaces = require(this.mainPkg).workspaces || [];
+    if (Array.isArray(workspaces)) return workspaces;
+    return workspaces.packages || [];
+  }
+
+  getNodePackages( { workspacePath = ospath.resolve('.') } = {} ) {
+    if (this.workspaces===[]) return [];
+    const globWorkspaces = this.workspaces.map((ws)=> ws + '/**/package.json');
+    const packagesJsons = fg.sync(
+      globWorkspaces,
+      {
+        deep: Infinity,
+        onlyFiles: true,
+        absolute: true,
+        cwd: workspacePath,
+        ignore: ['**/node_modules'],
+      },
+    );
+    this.packagesJsons = packagesJsons;
+    return packagesJsons;
+  }
+
+  aliasesToWorkspaces() {
+    const aliases = this.packagesJsons.reduce((alias, pkgPath) => {
+      const pkgName = require(pkgPath).name;
+      alias[pkgName] = ospath.dirname(pkgPath);
+      return alias;
+    }, {})
+    this.aliasObj = aliases;
+    return aliases;
+  }
+
+  getAlias() {
+    return this.aliasObj;
   }
 }
 
@@ -111,6 +160,10 @@ class WebpackConfig {
     }
     return convertedPath;
   }  
+
+  appendAlias(alias) {
+    this.aliasObj = { ...this.aliasObj, ...alias };
+  }
 }
 
 class BarrelFilesMapping {
@@ -192,6 +245,7 @@ class BarrelFilesMapping {
 
 const mapping = new BarrelFilesMapping();
 const webpackConfig = new WebpackConfig();
+const packageJsonConfig = new PackageJson();
 
 const importDeclarationVisitor = (path, state) => {
   const parsedJSFile = state.filename
@@ -227,6 +281,7 @@ module.exports = function (babel) {
       const plugins = state.opts.plugins;
       const plugin = plugins.find(plugin => plugin.key === PLUGIN_KEY);
       webpackConfig.getWebpackAlias(plugin);
+      webpackConfig.appendAlias(packageJsonConfig.getAlias());
     },
     visitor: {
       ImportDeclaration: importDeclarationVisitor,
