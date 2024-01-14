@@ -171,60 +171,123 @@ class BarrelFilesMapping {
     this.mapping = {};
   }
 
-  static isBarrelFile(modulePath) {
-    const barrelFileRegex = new RegExp(`index\.(js|mjs|jsx|ts|tsx)$`);
-    return barrelFileRegex.test(modulePath);
+  isBarrelFile(modulePath) {
+    const isBarrelFilename = (modulePath) => {
+      const barrelFileRegex = new RegExp(`index\.(js|mjs|jsx|ts|tsx)$`);
+      return barrelFileRegex.test(modulePath);  
+    }
+    const isScannedBarrelFilename = (modulePath) => {
+      return !!this.mapping[modulePath];
+    }
+    const isBarrelFileContent = (modulePath) => {
+      return !PathFunctions.isObjectEmpty(this.mapping[modulePath]);
+    }
+    if (!isBarrelFilename(modulePath)) return false;
+    if (!isScannedBarrelFilename(modulePath)) {
+      this.createSpecifiersMapping(modulePath);
+    };
+    return isBarrelFileContent(modulePath);
   }
 
-  createSpecifiersMapping(fullPathModule) {
+  createSpecifiersMapping(fullPathModule, forceFullScan = false) {
     const barrelAST = AST.filenameToAST(fullPathModule);
     this.mapping[fullPathModule] = {};
-    barrelAST.program.body.forEach((node) => {
+    const imports = {};
+    barrelAST.program.body.every((node) => {
+      const originalExportedPath = node.source?.value || fullPathModule;
+      const convertedExportedPath = webpackConfig.convertAliasToOriginal(fullPathModule, originalExportedPath);
+      let absoluteExportedPath = PathFunctions.getModuleAbsolutePath(fullPathModule, convertedExportedPath);
       if (t.isExportNamedDeclaration(node)) {
-        const originalExportedPath = node.source?.value || fullPathModule;
-        const convertedExportedPath = webpackConfig.convertAliasToOriginal(fullPathModule, originalExportedPath);
-        const absoluteExportedPath = PathFunctions.getModuleAbsolutePath(fullPathModule, convertedExportedPath);
         node.specifiers.forEach((specifier) => {
           const specifierExportedName = specifier.exported.name;
-          const specifierLocalName = specifier?.local?.name;
-          const specifierType = AST.getSpecifierType(specifier);
+          let specifierLocalName = specifier?.local?.name;
+          let specifierType = AST.getSpecifierType(specifier);
+          // if node.source exist -> export { abc } from './abc';
+          if (!node.source) {
+            // if node.source doesnt exist -> export { abc };
+            if (specifierLocalName in imports) {
+              absoluteExportedPath = imports[specifierLocalName]["path"];
+              specifierType = imports[specifierLocalName]["type"];
+              specifierLocalName = imports[specifierLocalName]["importedName"];
+            }
+          }
           this.mapping[fullPathModule][specifierExportedName] =
             this.createDirectSpecifierObject(absoluteExportedPath, specifierExportedName, specifierLocalName, specifierType);
         });
-        if (t.isVariableDeclaration(node.declaration)) {
+        if (node.declaration && !forceFullScan) {
+            this.mapping[fullPathModule] = {};
+            return false;
+        }  
+        if (node.declaration) {
           const specifierType = "named";
-          node.declaration.declarations.forEach((declaration) => {
+          const declarations = node.declaration.declarations || [node.declaration];
+          // if declaration exists -> export function abc(){};
+          // if declaration.declarations exists -> export const abc = 5, def = 10;
+          declarations.forEach((declaration) => {
             const specifierName = declaration.id.name;
             this.mapping[fullPathModule][specifierName] =
-              this.createDirectSpecifierObject(absoluteExportedPath, specifierName, specifierType);    
+              this.createDirectSpecifierObject(absoluteExportedPath, specifierName, specifierName, specifierType);    
           });
-        } else if (t.isFunctionDeclaration(node.declaration)) {
-          const specifierType = "named";
-          const specifierName = node.declaration.id.name;
-          this.mapping[fullPathModule][specifierName] =
-            this.createDirectSpecifierObject(absoluteExportedPath, specifierName, specifierType);
+        }
+      } else if (t.isExportDefaultDeclaration(node)) {
+        // export default abc;
+        if (node.declaration.name) {
+          let specifierLocalName = node.declaration.name;
+          if (specifierLocalName in imports) {
+            const specifierType = imports[specifierLocalName]["type"];
+            const specifierExportedName = "default";
+            const absoluteExportedPath = imports[specifierLocalName]["path"];
+            specifierLocalName = imports[specifierLocalName]["importedName"];
+            this.mapping[fullPathModule][specifierExportedName] =
+              this.createDirectSpecifierObject(absoluteExportedPath, specifierExportedName, specifierLocalName, specifierType);
+          }
         }
       } else if (t.isExportAllDeclaration(node)) {
-        const originalExportedPath = node.source.value;
-        const convertedExportedPath = webpackConfig.convertAliasToOriginal(fullPathModule, originalExportedPath);
-        const absoluteExportedPath = PathFunctions.getModuleAbsolutePath(fullPathModule, convertedExportedPath);
+        // export * from './abc';
         if (!this.mapping[absoluteExportedPath]) {
-          this.createSpecifiersMapping(absoluteExportedPath);
+          this.createSpecifiersMapping(absoluteExportedPath, true);
         }
         Object.assign(this.mapping[fullPathModule],this.mapping[absoluteExportedPath]);
+        delete this.mapping[absoluteExportedPath];
+      } else if (t.isImportDeclaration(node)) {
+        if (!AST.isAnySpecifierExist(node.specifiers) && !forceFullScan) {
+        // import './abc';
+          this.mapping[fullPathModule] = {};
+          return false;
+        }
+        node.specifiers.forEach((specifier) => {
+        // import {abc, def} from './abc';
+          const specifierImportedName = specifier?.imported?.name;
+          const specifierLocalName = specifier?.local?.name;
+          const specifierType = AST.getSpecifierType(specifier);
+          const originalExportedPath = node.source.value;
+          const convertedExportedPath = webpackConfig.convertAliasToOriginal(fullPathModule, originalExportedPath);
+          const absoluteExportedPath = PathFunctions.getModuleAbsolutePath(fullPathModule, convertedExportedPath);
+          imports[specifierLocalName] = {
+            importedName: specifierImportedName,
+            localName: specifierLocalName,
+            path: absoluteExportedPath,
+            type: specifierType,
+          };
+        });
+      } else {
+        if (forceFullScan) {
+          return true;
+        } else {
+          this.mapping[fullPathModule] = {};
+          return false;  
+        }
       }
+      return true;
     });
   }
 
   createDirectSpecifierObject(fullPathModule, specifierExportedName, specifierLocalName, specifierType) {
-    if (BarrelFilesMapping.isBarrelFile(fullPathModule)) {
-      if (!this.mapping[fullPathModule]) {
-        this.createSpecifiersMapping(fullPathModule);
-      }
-      const originalPath = this.mapping[fullPathModule][specifierExportedName]["path"];
-      const originalExportedName = this.mapping[fullPathModule][specifierExportedName]["exportedName"];
-      const originalLocalName = this.mapping[fullPathModule][specifierExportedName]["localName"];
-      const originalType = this.mapping[fullPathModule][specifierExportedName]["type"];
+    if (this.isBarrelFile(fullPathModule)) {
+      const originalPath = this.mapping[fullPathModule][specifierLocalName]["path"];
+      const originalExportedName = this.mapping[fullPathModule][specifierLocalName]["exportedName"];
+      const originalLocalName = this.mapping[fullPathModule][specifierLocalName]["localName"];
+      const originalType = this.mapping[fullPathModule][specifierLocalName]["type"];
       return this.createDirectSpecifierObject(originalPath, originalExportedName, originalLocalName, originalType);
     }
     return {
@@ -236,9 +299,6 @@ class BarrelFilesMapping {
   }
 
   getDirectSpecifierObject(fullPathModule, specifierExportedName) {
-    if (!this.mapping[fullPathModule]) {
-      this.createSpecifiersMapping(fullPathModule);
-    }
     return this.mapping[fullPathModule][specifierExportedName];
   }
 }
@@ -248,18 +308,20 @@ const webpackConfig = new WebpackConfig();
 const packageJsonConfig = new PackageJson();
 
 const importDeclarationVisitor = (path, state) => {
+  const originalImportsSpecifiers = path.node.specifiers;
+  if (!AST.isAnySpecifierExist(originalImportsSpecifiers)) return;
+  if (AST.getSpecifierType(originalImportsSpecifiers[0]) === "namespace") return;
   const parsedJSFile = state.filename
   const originalImportsPath = path.node.source.value;
-  const originalImportsSpecifiers = path.node.specifiers;
   const convertedImportsPath = webpackConfig.convertAliasToOriginal(parsedJSFile, originalImportsPath);
   if (PathFunctions.checkIfModule(convertedImportsPath)) return;
   const importModuleAbsolutePath = PathFunctions.getModuleAbsolutePath(parsedJSFile, convertedImportsPath);
-  if (!BarrelFilesMapping.isBarrelFile(importModuleAbsolutePath)) return;
+  if (!mapping.isBarrelFile(importModuleAbsolutePath)) return;
   const directSpecifierASTArray = originalImportsSpecifiers.map(
     (specifier) => {
       const directSpecifierObject = mapping.getDirectSpecifierObject(
         importModuleAbsolutePath,
-        specifier.imported.name
+        specifier?.imported?.name || "default"
       );
       const newImportProperties = {
         localName: specifier.local.name,
