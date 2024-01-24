@@ -6,7 +6,7 @@ class AST {
     static filenameToAST = (filename) => {
       try {
         const content = fs.readFileSync(filename, "utf-8");
-        return parser.parse(content, { sourceType: "module", plugins:["jsx"] });
+        return parser.parse(content, { sourceType: "module", plugins:["jsx", "typescript"] });
       } catch (error) {
         return null;
       }
