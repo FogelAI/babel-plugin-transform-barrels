@@ -1,4 +1,8 @@
 # babel-plugin-transform-barrels
+
+[![npm](https://badgen.net/npm/v/babel-plugin-transform-barrels)](https://www.npmjs.com/package/babel-plugin-transform-barrels)
+[![downloads](https://badgen.net/npm/dt/babel-plugin-transform-barrels)](https://www.npmjs.com/package/babel-plugin-transform-barrels)
+
 This Babel plugin transforms indirect imports through a barrel file (index.js) into direct imports.
 
 ### Note

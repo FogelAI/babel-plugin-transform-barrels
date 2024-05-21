@@ -1,191 +1,261 @@
+const ospath = require("path");
 const t = require("@babel/types");
 const AST = require("./ast");
 const PathFunctions = require("./path");
-const { PackageJson, WebpackConfig, JestConfig } = require("./alias");
+const resolver = require("./resolver");
+const packageManager = require("./packages");
 
-class BarrelFilesMapping {
-  constructor() {
-    this.mapping = {};
-  }
+class BarrelFile {
+    constructor(path) {
+        this.path = path;
+        this.exportMapping = {};
+        this.importMapping = {};
+    }
 
-  isBarrelFile(modulePath) {
-    const isBarrelFilename = (modulePath) => {
+    static isBarrelFilename(path) {
       const barrelFileRegex = new RegExp(`index\.(js|mjs|jsx|ts|tsx)$`);
-      return barrelFileRegex.test(modulePath);  
-    }
-    const isScannedBarrelFilename = (modulePath) => {
-      return !!this.mapping[modulePath];
-    }
-    const isBarrelFileContent = (modulePath) => {
-      return !PathFunctions.isObjectEmpty(this.mapping[modulePath]);
-    }
-    if (!isBarrelFilename(modulePath)) return false;
-    if (!isScannedBarrelFilename(modulePath)) {
-      this.createSpecifiersMapping(modulePath);
-    };
-    return isBarrelFileContent(modulePath);
-  }
+      return barrelFileRegex.test(path);  
+    }    
 
-  createSpecifiersMapping(fullPathModule, forceFullScan = false) {
-    const barrelAST = AST.filenameToAST(fullPathModule);
-    this.mapping[fullPathModule] = {};
-    const imports = {};
-    barrelAST.program.body.every((node) => {
-      const originalExportedPath = node.source?.value || fullPathModule;
-      const convertedExportedPath = webpackConfig.convertAliasToOriginal(fullPathModule, originalExportedPath);
-      let absoluteExportedPath = PathFunctions.getModuleAbsolutePath(fullPathModule, convertedExportedPath);
-      if (t.isExportNamedDeclaration(node)) {
-        node.specifiers.forEach((specifier) => {
-          const specifierExportedName = specifier.exported.name;
-          let specifierLocalName = specifier?.local?.name;
-          let specifierType = AST.getSpecifierType(specifier);
-          // if node.source exist -> export { abc } from './abc';
-          if (!node.source) {
-            // if node.source doesnt exist -> export { abc };
-            if (specifierLocalName in imports) {
-              absoluteExportedPath = imports[specifierLocalName]["path"];
-              specifierType = imports[specifierLocalName]["type"];
-              specifierLocalName = imports[specifierLocalName]["importedName"];
+    get isBarrelFileContent() {
+        return !PathFunctions.isObjectEmpty(this.exportMapping);
+    }    
+
+    handleExportNamedDeclaration(node) {
+        if (node.specifiers.length > 0) {
+          node.specifiers.forEach((specifier) => {
+            let specifierObj = SpecifierFactory.createSpecifier("export");
+            if (node.source) {
+              // if node.source exist -> export { abc } from './abc';
+              specifierObj.exportedName = specifier.exported.name;
+              specifierObj.localName = specifier?.local?.name;
+              specifierObj.type = AST.getSpecifierType(specifier);
+              const exportPath = node.source.value;
+              specifierObj.esmPath = resolver.resolve(exportPath, this.path).absEsmFile;
+            } else {
+              // if node.source doesnt exist -> export { abc };
+              const localName = specifier?.local?.name;
+              if (localName in this.importMapping) {
+                specifierObj = this.importMapping[localName].toExportSpecifier();
+                specifierObj.exportedName = specifier.exported.name;
+              }
             }
-          }
-          this.mapping[fullPathModule][specifierExportedName] =
-            this.createDirectSpecifierObject(absoluteExportedPath, specifierExportedName, specifierLocalName, specifierType);
-        });
-        if (node.declaration && !forceFullScan) {
-            this.mapping[fullPathModule] = {};
-            return false;
-        }  
+            const { exportedName } = specifierObj;
+            this.exportMapping[exportedName] = this.getDeepestDirectSpecifierObject(specifierObj);
+          });
+        };
         if (node.declaration) {
-          const specifierType = "named";
+          const specifierObj = SpecifierFactory.createSpecifier("export");
+          specifierObj.type = "named";
+          specifierObj.esmPath = this.path;
           const declarations = node.declaration.declarations || [node.declaration];
           // if declaration exists -> export function abc(){};
           // if declaration.declarations exists -> export const abc = 5, def = 10;
           declarations.forEach((declaration) => {
-            const specifierName = declaration.id.name;
-            this.mapping[fullPathModule][specifierName] =
-              this.createDirectSpecifierObject(absoluteExportedPath, specifierName, specifierName, specifierType);    
+            specifierObj.localName = declaration.id.name;
+            specifierObj.exportedName = declaration.id.name;
+            const { exportedName } = specifierObj;
+            this.exportMapping[exportedName] = this.getDeepestDirectSpecifierObject(specifierObj);    
           });
         }
-      } else if (t.isExportDefaultDeclaration(node)) {
+    }
+    
+    handleExportDefaultDeclaration(node) {
         // export default abc;
         if (node.declaration.name) {
-          let specifierLocalName = node.declaration.name;
-          if (specifierLocalName in imports) {
-            const specifierType = imports[specifierLocalName]["type"];
-            const specifierExportedName = "default";
-            const absoluteExportedPath = imports[specifierLocalName]["path"];
-            specifierLocalName = imports[specifierLocalName]["importedName"];
-            this.mapping[fullPathModule][specifierExportedName] =
-              this.createDirectSpecifierObject(absoluteExportedPath, specifierExportedName, specifierLocalName, specifierType);
+          const localName = node.declaration.name;
+          if (localName in this.importMapping) {
+            const specifierObj = this.importMapping[localName].toExportSpecifier();
+            specifierObj.exportedName = "default";
+            const { exportedName } = specifierObj;
+            this.exportMapping[exportedName] = this.getDeepestDirectSpecifierObject(specifierObj);
           }
         }
-      } else if (t.isExportAllDeclaration(node)) {
-        // export * from './abc';
-        if (!this.mapping[absoluteExportedPath]) {
-          this.createSpecifiersMapping(absoluteExportedPath, true);
-        }
-        Object.assign(this.mapping[fullPathModule],this.mapping[absoluteExportedPath]);
-        delete this.mapping[absoluteExportedPath];
-      } else if (t.isImportDeclaration(node)) {
-        if (!AST.isAnySpecifierExist(node.specifiers) && !forceFullScan) {
-        // import './abc';
-          this.mapping[fullPathModule] = {};
-          return false;
-        }
-        node.specifiers.forEach((specifier) => {
-        // import {abc, def} from './abc';
-          const specifierImportedName = specifier?.imported?.name;
-          const specifierLocalName = specifier?.local?.name;
-          const specifierType = AST.getSpecifierType(specifier);
-          const originalExportedPath = node.source.value;
-          const convertedExportedPath = webpackConfig.convertAliasToOriginal(fullPathModule, originalExportedPath);
-          const absoluteExportedPath = PathFunctions.getModuleAbsolutePath(fullPathModule, convertedExportedPath);
-          imports[specifierLocalName] = {
-            importedName: specifierImportedName,
-            localName: specifierLocalName,
-            path: absoluteExportedPath,
-            type: specifierType,
-          };
-        });
-      } else {
-        if (forceFullScan) {
-          return true;
-        } else {
-          this.mapping[fullPathModule] = {};
-          return false;  
-        }
-      }
-      return true;
-    });
-  }
-
-  createDirectSpecifierObject(fullPathModule, specifierExportedName, specifierLocalName, specifierType) {
-    if (this.isBarrelFile(fullPathModule)) {
-      const originalPath = this.mapping[fullPathModule][specifierLocalName]["path"];
-      const originalExportedName = this.mapping[fullPathModule][specifierLocalName]["exportedName"];
-      const originalLocalName = this.mapping[fullPathModule][specifierLocalName]["localName"];
-      const originalType = this.mapping[fullPathModule][specifierLocalName]["type"];
-      return this.createDirectSpecifierObject(originalPath, originalExportedName, originalLocalName, originalType);
     }
-    return {
-      exportedName: specifierExportedName,
-      localName: specifierLocalName,
-      path: fullPathModule,
-      type: specifierType,
-    };
-  }
+    
+    handleExportAllDeclaration(node) {
+        // export * from './abc';
+        const exportPath = node.source.value;
+        let absoluteExportedPath = resolver.resolve(exportPath, this.path).absEsmFile;
+        const exportedAllFile = new BarrelFile(absoluteExportedPath);
+        exportedAllFile.createSpecifiersMapping(true);
+        Object.assign(this.exportMapping, exportedAllFile.exportMapping);
+    }
+    
+    handleImportDeclaration(node) {
+        node.specifiers.forEach((specifier) => {
+            // import {abc, def} from './abc';
+            const specifierObj = SpecifierFactory.createSpecifier("import");
+            specifierObj.importedName = specifier?.imported?.name;
+            specifierObj.localName = specifier.local.name;
+            specifierObj.type = AST.getSpecifierType(specifier);
+            const importPath = node.source.value;
+            specifierObj.esmPath = resolver.resolve(importPath, this.path).absEsmFile;
+            const { localName } = specifierObj;
+            this.importMapping[localName] = specifierObj;
+        });
+    }
+    
+    createSpecifiersMapping(forceFullScan = false) {
+        const barrelAST = AST.filenameToAST(this.path);
+        barrelAST.program.body.every((node) => {
+          if (t.isExportNamedDeclaration(node)) {
+            // export { abc } from './abc';
+            // export { abc };
+            // export function abc(){};
+            // export const abc = 5, def = 10;
+            if (node.declaration && !forceFullScan) {
+              this.exportMapping = {};
+              return false;
+            }  
+            this.handleExportNamedDeclaration(node);
+          } else if (t.isExportDefaultDeclaration(node)) {
+            // export default abc;
+            this.handleExportDefaultDeclaration(node);
+          } else if (t.isExportAllDeclaration(node)) {
+            // export * from './abc';
+            this.handleExportAllDeclaration(node);
+          } else if (t.isImportDeclaration(node)) {
+            if (!AST.isAnySpecifierExist(node.specifiers) && !forceFullScan) {
+            // import './abc';
+              this.exportMapping = {};
+              return false;
+            }
+            // import {abc, def} from './abc';
+            this.handleImportDeclaration(node);
+          } else {
+            if (forceFullScan) {
+              return true;
+            } else {
+              this.exportMapping = {};
+              return false;  
+            }
+          }
+          return true;
+        });
+        this.path = PathFunctions.normalizeModulePath(this.path);
+    }    
 
-  getDirectSpecifierObject(fullPathModule, specifierExportedName) {
-    return this.mapping[fullPathModule][specifierExportedName];
-  }
+    getDeepestDirectSpecifierObject(specifierObj) {
+        const { esmPath, localName } = specifierObj;
+        if (BarrelFile.isBarrelFilename(esmPath)) {
+          const barrelFile = BarrelFileManager.getBarrelFile(esmPath);
+          if (barrelFile.isBarrelFileContent) {
+            const deepestSpecifier = barrelFile.getDirectSpecifierObject(localName);
+            return this.getDeepestDirectSpecifierObject(deepestSpecifier);
+          }  
+        }
+        specifierObj.esmPath = PathFunctions.normalizeModulePath(specifierObj.esmPath);
+        return specifierObj;
+    }
+
+    getDirectSpecifierObject(specifierExportedName) {
+        return this.exportMapping[specifierExportedName];
+    }    
 }
 
-const mapping = new BarrelFilesMapping();
-const webpackConfig = new WebpackConfig();
-const jestConfig = new JestConfig();
-const packageJsonConfig = new PackageJson();
-
-const importDeclarationVisitor = (path, state) => {
-  const originalImportsSpecifiers = path.node.specifiers;
-  if (!AST.isAnySpecifierExist(originalImportsSpecifiers)) return;
-  if (AST.getSpecifierType(originalImportsSpecifiers[0]) === "namespace") return;
-  const parsedJSFile = state.filename
-  const originalImportsPath = path.node.source.value;
-  const convertedImportsPath = webpackConfig.convertAliasToOriginal(parsedJSFile, originalImportsPath);
-  if (PathFunctions.checkIfModule(convertedImportsPath)) return;
-  const importModuleAbsolutePath = PathFunctions.getModuleAbsolutePath(parsedJSFile, convertedImportsPath);
-  if (!mapping.isBarrelFile(importModuleAbsolutePath)) return;
-  const directSpecifierASTArray = originalImportsSpecifiers.map(
-    (specifier) => {
-      const directSpecifierObject = mapping.getDirectSpecifierObject(
-        importModuleAbsolutePath,
-        specifier?.imported?.name || "default"
-      );
-      const newImportProperties = {
-        localName: specifier.local.name,
-        importedName: directSpecifierObject["localName"],
-        path: directSpecifierObject["path"],
-        type: directSpecifierObject["type"],
-      }
-      return AST.createASTImportDeclaration(newImportProperties);
+class BarrelFileManager {
+    constructor() {
+      this.barrelFiles = new Map();
     }
-  );
-  path.replaceWithMultiple(directSpecifierASTArray);
-};
+  
+    getBarrelFileInner(path) {
+      let barrelFile = new BarrelFile(path);
+      if (BarrelFile.isBarrelFilename(path)) {
+        const barrelKeyName = PathFunctions.normalizeModulePath(path);
+        if (!this.barrelFiles.has(barrelKeyName)) {
+            barrelFile.createSpecifiersMapping();
+            this.barrelFiles.set(barrelKeyName, barrelFile);
+        }
+        barrelFile = this.barrelFiles.get(barrelKeyName);
+      };
+      return barrelFile;
+    }
 
-module.exports = function (babel) {
-  const PLUGIN_KEY = 'transform-barrels';
-  return {
-    name: PLUGIN_KEY,
-    pre(state) {
-      const plugins = state.opts.plugins;
-      const plugin = plugins.find(plugin => plugin.key === PLUGIN_KEY);
-      webpackConfig.getWebpackAlias(plugin);
-      webpackConfig.appendAlias(packageJsonConfig.getAlias());
-      webpackConfig.appendAlias(jestConfig.getJestAlias(plugin));
-    },
-    visitor: {
-      ImportDeclaration: importDeclarationVisitor,
-    },
-  };
-};
+    static getBarrelFile(path) {
+      if (!BarrelFile.isBarrelFilename(path)) return new BarrelFile();
+      const packageObj = packageManager.getMainPackageOfModule(path, new BarrelFileManager());
+      const barrelFile = packageObj.barrelFileManager.getBarrelFileInner(path);
+      return barrelFile;
+    }
+}
+
+class SpecifierFactory {
+    static createSpecifier(type) {
+        switch (type) {
+          case 'export':
+            return new ExportSpecifier();
+          case 'import':
+            return new ImportSpecifier();
+          default:
+            throw new Error('Invalid specifier type');
+        }
+    }
+}
+
+class ExportSpecifier {
+    constructor() {
+        this.esmPath = "";
+        this.exportedName = "";
+        this.localName = "";
+        this.type = "";
+    }
+
+    toImportSpecifier() {
+        const specifierObj = SpecifierFactory.createSpecifier("import");
+        specifierObj.type = this.type;
+        specifierObj.esmPath = this.esmPath;
+        if (!PathFunctions.isNodeModule(specifierObj.esmPath)) {
+          specifierObj.esmPath = ospath.join(process.cwd(), specifierObj.esmPath);
+        }
+        specifierObj.importedName = this.localName;
+        return specifierObj;
+    }
+
+    get absEsmPath() {
+      return PathFunctions.getAbsolutePath(this.esmPath, resolver.from);
+    }
+
+    get cjsPath() {
+      const packageObj = packageManager.getMainPackageOfModule(this.absEsmPath, new BarrelFileManager());
+      return packageObj.convertESMToCJSPath(this.esmPath);
+    }
+
+    get path() {
+      const packageObj = packageManager.packages.get(".");
+      return packageObj.type === "commonjs" ? this.cjsPath : this.esmPath;
+    }
+}
+
+class ImportSpecifier {
+    constructor() {
+        this.esmPath = "";
+        this.importedName = "";
+        this.localName = "";
+        this.type = "";
+    }
+
+    toExportSpecifier() {
+        const specifierObj = SpecifierFactory.createSpecifier("export");
+        specifierObj.type = this.type;
+        specifierObj.esmPath = this.esmPath;
+        specifierObj.localName = this.importedName;
+        return specifierObj;
+    }
+
+    get absEsmPath() {
+      return PathFunctions.getAbsolutePath(this.esmPath, resolver.from);
+    }
+
+    get cjsPath() {
+      const packageObj = packageManager.getMainPackageOfModule(this.absEsmPath, new BarrelFileManager());
+      return packageObj.convertESMToCJSPath(this.esmPath);
+    }
+
+    get path() {
+      const packageObj = packageManager.packages.get(".");
+      return packageObj.type === "commonjs" ? this.cjsPath : this.esmPath;
+    }
+}
+
+module.exports = BarrelFileManager;
