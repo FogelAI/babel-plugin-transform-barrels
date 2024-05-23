@@ -70,7 +70,7 @@ There are two issues that can occur in Jest when using barrel files:
 2. Performance impact - The presence of unused modules from barrel files can slow down starting test suites due to unnecessary loading overhead.
 
 ### Note
-I recommend reading my article [*Potential issues with barrel files in Webpack*](https://dev.to/fogel/potential-issues-with-barrel-files-in-webpack-4bf2) for more information on possible issues can caused by barrel files.
+I recommend reading my articles [*Potential issues with barrel files in Webpack*](https://dev.to/fogel/potential-issues-with-barrel-files-in-webpack-4bf2) and [*Potential issues with barrel files in Jest*](https://dev.to/fogel/potential-issues-with-barrel-files-in-jest-1nkl) for more information on possible issues can caused by barrel files.
 
 ## Possible Solutions
 
