@@ -1,12 +1,12 @@
 const ospath = require("path");
 const PathFunctions = require("./path");
+const resolver = require("./resolver");
 
 class Package {
-    constructor(path, barrelFileManager) {
+    constructor(path) {
         this.path = path;
         this.name = this.getHighestPackageName();
         this.data;
-        this.barrelFileManager = barrelFileManager;
     }
 
     static getHighestParentPackageDir(path) {
@@ -62,6 +62,10 @@ class Package {
         return this.data.type || "commonjs";
     }
 
+    get version() {
+        return this.data.version;
+    }
+
     convertESMToCJSPath(path) {
         return path.replace(this.esmFolder, this.cjsFolder);
     }
@@ -82,11 +86,29 @@ class PackageManager {
       }
       instance = this;
     }
-  
-    getMainPackageOfModule(modulePath, barrelFileManager) {
+
+    getNearestPackageJsonPath() {
+        let currentDir = ospath.dirname(resolver.from);
+        while (currentDir) {
+            const packagePath = ospath.join(currentDir, "package.json");
+            if (PathFunctions.fileExists(packagePath)) {
+                return packagePath;
+            }
+            currentDir = currentDir.substring(0, currentDir.lastIndexOf(ospath.sep));
+        }
+    }
+
+    getNearestPackageJsonContent() {
+        const packagePath = this.getNearestPackageJsonPath();
+        if (!packagePath) return "";
+        const packageObj = require(packagePath);
+        return packageObj;
+    }
+
+    getMainPackageOfModule(modulePath) {
       const moduleDir = ospath.dirname(modulePath)
       const mainPackageJSONFile = Package.getMainPackageJSON(moduleDir);
-      let packageObj = new Package(mainPackageJSONFile, barrelFileManager);
+      let packageObj = new Package(mainPackageJSONFile);
       if (!this.packages.has(packageObj.name)) {
         packageObj.load();
         this.packages.set(packageObj.name, packageObj);
@@ -98,4 +120,4 @@ class PackageManager {
 
 const singletonPackageManager = new PackageManager();
 
-module.exports = singletonPackageManager;
+module.exports = { Package, packageManager: singletonPackageManager };
