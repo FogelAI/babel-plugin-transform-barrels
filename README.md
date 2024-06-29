@@ -35,13 +35,13 @@ import { List } from './components/List/List'
 2. Add the following to your Webpack config file in the rule with a `babel-loader` loader:
 
     ```javascript
-    "plugins": ["transform-barrels", { webpackConfigFilename: __filename, ...(typeof module.exports === "function" && { args: arguments })}]
+    "plugins": [["transform-barrels", "Options (object) - see below"]]
     ```
 
    Alternatively, you can add `babel-plugin-transform-barrels` to your babel config file:
 
     ```javascript
-    "plugins": ["babel-plugin-transform-barrels"]
+    "plugins": [["babel-plugin-transform-barrels", "Options (object) - see below"]]
     ```
 
 3. Add the following configuration to your Jest config file:
@@ -56,6 +56,14 @@ import { List } from './components/List/List'
    Copy the [`config`](config) folder to the same folder as the Jest config file.
    <br>
    Adapt the `config/jest/babelTransform.js` file according to code transformation needs.
+
+## Options
+
+|     **Name**     |  **Type** | **Default** |                                    **Description**                                   |
+|:----------------:|:---------:|:-----------:|:------------------------------------------------------------------------------------:|
+|  `webpackAlias`  |  `object` |     `{}`    |     It should be assigned with the `alias` value option from the Webpack config.     |
+|    `jestAlias`   |  `array`  |     `[]`    | It should be assigned with the `moduleNameMapper` value option from the Jest config. |
+| `isCacheEnabled` | `boolean` |   `false`   |                         If `true`, enables file-based cache.                         |
 
 ## The Problem
 

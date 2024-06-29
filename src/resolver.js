@@ -70,8 +70,8 @@ class Resolver {
           const absEsmModule = esmModule && ospath.join(path, esmModule);
           const resolvedPath = new ResolvedPath();
           const extensions = ["", ".js", ".jsx", ".ts", ".tsx"];
-          resolvedPath.absCjsFile = absCjsModule && this.getFilePathWithExtension(absCjsModule, extensions)
-          resolvedPath.absEsmFile = absEsmModule && this.getFilePathWithExtension(absEsmModule, extensions)
+          resolvedPath.absCjsFile = absCjsModule ? this.getFilePathWithExtension(absCjsModule, extensions) : ""
+          resolvedPath.absEsmFile = absEsmModule ? this.getFilePathWithExtension(absEsmModule, extensions) : ""
           return resolvedPath;
       }
     }  

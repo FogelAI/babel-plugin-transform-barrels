@@ -1,5 +1,5 @@
 # dependencies
-/node_modules
+node_modules
 
 # others
 /build
@@ -10,6 +10,7 @@
 /images
 package-lock.json
 yarn.lock
+babel-plugin-transform-barrels_cache
 
 
 # misc
