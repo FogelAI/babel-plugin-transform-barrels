@@ -58,25 +58,10 @@ class Workspaces {
   
 class AliasWebpack {
     constructor(options) {
-      this.path = options.webpackConfigFilename;
-      this.args = options.args || [];
-      this.data = {};
-      this.aliasObj = {};
-    }
-
-    resolveWebpackConfig() {
-      const webpackConfigObj = require(this.path);
-      if (typeof webpackConfigObj === 'object') {
-        this.data = webpackConfigObj;
-      } else if (typeof webpackConfigObj === 'function') {
-        this.data = webpackConfigObj(...this.args);
-      }
+      this.aliasObj = options?.webpackAlias || {};
     }
 
     load() {
-      if (!this.path) return;
-      this.resolveWebpackConfig();
-      this.aliasObj = this.data?.resolve?.alias || {};
       this.addPrefixRegexToAliases();
     }
 
@@ -102,23 +87,12 @@ class AliasWebpack {
   
 class AliasJest {
     constructor(options) {
-      this.aliasObj = options.jestAlias || {};
+      this.aliasObj = options?.jestAlias || [];
     }
   
     load() {
-      if (PathFunctions.isObjectEmpty(this.aliasObj)) return;
-      this.buildAliasMap();
+      this.aliasObj = Object.fromEntries(this.aliasObj);
     }
-
-    buildAliasMap() {
-      if (PathFunctions.isObjectEmpty(this.aliasObj)) return;
-      const newAliasObj = {};
-      this.aliasObj.forEach((alias)=>{
-        newAliasObj[alias[0]] = alias[1];
-      })
-      this.aliasObj = newAliasObj;
-      return this.aliasObj;
-    }  
 
     getAlias() {
       return this.aliasObj;
