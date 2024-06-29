@@ -3,7 +3,9 @@ const t = require("@babel/types");
 const AST = require("./ast");
 const PathFunctions = require("./path");
 const resolver = require("./resolver");
-const packageManager = require("./packages");
+const { Package, packageManager } = require("./packages");
+const Cache = require("./cache");
+const pluginOptions = require("./pluginOptions");
 
 class BarrelFile {
     constructor(path) {
@@ -139,7 +141,7 @@ class BarrelFile {
     getDeepestDirectSpecifierObject(specifierObj) {
         const { esmPath, localName } = specifierObj;
         if (BarrelFile.isBarrelFilename(esmPath)) {
-          const barrelFile = BarrelFileManager.getBarrelFile(esmPath);
+          const barrelFile = BarrelFileManagerFacade.getBarrelFile(esmPath);
           if (barrelFile.isBarrelFileContent) {
             const deepestSpecifier = barrelFile.getDirectSpecifierObject(localName);
             return this.getDeepestDirectSpecifierObject(deepestSpecifier);
@@ -154,12 +156,14 @@ class BarrelFile {
     }    
 }
 
-class BarrelFileManager {
-    constructor() {
-      this.barrelFiles = new Map();
+class BarrelFilesPackage {
+    constructor(packageObj, cache) {
+      this.packageObj = packageObj;
+      this.cache = cache;
+      this.barrelFiles = this.cache?.data || new Map();
     }
-  
-    getBarrelFileInner(path) {
+
+    getBarrelFile(path) {
       let barrelFile = new BarrelFile(path);
       if (BarrelFile.isBarrelFilename(path)) {
         const barrelKeyName = PathFunctions.normalizeModulePath(path);
@@ -171,13 +175,83 @@ class BarrelFileManager {
       };
       return barrelFile;
     }
+}
 
-    static getBarrelFile(path) {
-      if (!BarrelFile.isBarrelFilename(path)) return new BarrelFile();
-      const packageObj = packageManager.getMainPackageOfModule(path, new BarrelFileManager());
-      const barrelFile = packageObj.barrelFileManager.getBarrelFileInner(path);
-      return barrelFile;
+class BarrelFilesPackageCacheStrategy {
+  customizedParsingMethod(cacheData) {
+    const barrelFiles = new Map();
+    for (const [key, value] of Object.entries(cacheData)) {
+      const barrelFile = Object.assign(new BarrelFile(), value);
+      for (const [exportMappingKey, exportMappingValue] of Object.entries(value.exportMapping)) {
+        barrelFile.exportMapping[exportMappingKey] = Object.assign(SpecifierFactory.createSpecifier("export"), exportMappingValue);
+      }
+      barrelFiles.set(key, barrelFile);
     }
+    return barrelFiles;
+  }
+}
+
+class BarrelFilesPackageCacheFacade {
+  static getCachePackageFileName(packageName) {
+    if (PathFunctions.isNodeModule(packageName)) {
+      return `${packageName}.json`.replace("\\","_");
+    } else {
+      return `local.json`;
+    }
+  }  
+
+  static createCache(packageObj) {
+    const { isCacheEnabled } = pluginOptions.options;
+    if (!isCacheEnabled || !PathFunctions.isNodeModule(packageObj.path)) return;
+    const cacheFileName = BarrelFilesPackageCacheFacade.getCachePackageFileName(packageObj.name);
+    const packagesVersionsFileName = 'packagesVersions.json'
+    const cacheFolderName = "babel-plugin-transform-barrels_cache"
+    const cache = new Cache(cacheFileName, cacheFolderName, packagesVersionsFileName, packageObj.name, packageObj.version, new BarrelFilesPackageCacheStrategy());
+    if (cache.isCacheUpdated) {
+      cache.loadCacheData();  
+    }
+    return cache;
+  }
+}
+
+
+class BarrelFilesPackagesManager {
+  constructor() {
+    this.barrelFilesByPackage = new Map();
+  }
+
+  getBarrelFileManager(path) {
+    const moduleDir = ospath.dirname(path)
+    const mainPackagePath = Package.getHighestParentPackageDir(moduleDir);
+    const packageName = PathFunctions.normalizeModulePath(mainPackagePath);
+    let barrelFilesPackage;
+    if (!this.barrelFilesByPackage.has(packageName)) {
+      const packageObj = packageManager.getMainPackageOfModule(path);
+      const cache = BarrelFilesPackageCacheFacade.createCache(packageObj);
+      barrelFilesPackage = new BarrelFilesPackage(packageObj, cache);
+      this.barrelFilesByPackage.set(packageName, barrelFilesPackage);
+    }
+    barrelFilesPackage = this.barrelFilesByPackage.get(packageName);
+    return barrelFilesPackage;
+  }
+}
+
+class BarrelFileManagerFacade {
+  static getBarrelFile(path) {
+    if (!BarrelFile.isBarrelFilename(path)) return new BarrelFile();
+    const barrelFilesPackage = barrelFilesPackagesManager.getBarrelFileManager(path);
+    const barrelFile = barrelFilesPackage.getBarrelFile(path);
+    return barrelFile;
+  }
+
+  static saveToCacheAllPackagesBarrelFiles() {
+    const { isCacheEnabled } = pluginOptions.options;
+    barrelFilesPackagesManager.barrelFilesByPackage.forEach((barrelFilesPackage)=>{
+      if (isCacheEnabled && PathFunctions.isNodeModule(barrelFilesPackage.packageObj.path) && !barrelFilesPackage.cache.isCacheUpdated) {
+        barrelFilesPackage.cache.saveCache(barrelFilesPackage.barrelFiles);
+      }
+    })
+  }
 }
 
 class SpecifierFactory {
@@ -193,12 +267,32 @@ class SpecifierFactory {
     }
 }
 
-class ExportSpecifier {
+class Specifier {
+  constructor() {
+      this.esmPath = "";
+      this.type = "";
+      this.localName = "";
+  }
+
+  get absEsmPath() {
+    return PathFunctions.getAbsolutePath(this.esmPath, resolver.from);
+  }
+
+  get cjsPath() {
+    const packageObj = packageManager.getMainPackageOfModule(this.absEsmPath);
+    return packageObj.convertESMToCJSPath(this.esmPath);
+  }
+
+  get path() {
+    const packageObj = packageManager.getNearestPackageJsonContent();
+    return packageObj?.type === "module" ? this.esmPath : this.cjsPath;
+  }
+}
+
+class ExportSpecifier extends Specifier {
     constructor() {
-        this.esmPath = "";
+        super();
         this.exportedName = "";
-        this.localName = "";
-        this.type = "";
     }
 
     toImportSpecifier() {
@@ -211,28 +305,12 @@ class ExportSpecifier {
         specifierObj.importedName = this.localName;
         return specifierObj;
     }
-
-    get absEsmPath() {
-      return PathFunctions.getAbsolutePath(this.esmPath, resolver.from);
-    }
-
-    get cjsPath() {
-      const packageObj = packageManager.getMainPackageOfModule(this.absEsmPath, new BarrelFileManager());
-      return packageObj.convertESMToCJSPath(this.esmPath);
-    }
-
-    get path() {
-      const packageObj = packageManager.packages.get(".");
-      return packageObj.type === "commonjs" ? this.cjsPath : this.esmPath;
-    }
 }
 
-class ImportSpecifier {
+class ImportSpecifier extends Specifier {
     constructor() {
-        this.esmPath = "";
+        super();
         this.importedName = "";
-        this.localName = "";
-        this.type = "";
     }
 
     toExportSpecifier() {
@@ -242,20 +320,8 @@ class ImportSpecifier {
         specifierObj.localName = this.importedName;
         return specifierObj;
     }
-
-    get absEsmPath() {
-      return PathFunctions.getAbsolutePath(this.esmPath, resolver.from);
-    }
-
-    get cjsPath() {
-      const packageObj = packageManager.getMainPackageOfModule(this.absEsmPath, new BarrelFileManager());
-      return packageObj.convertESMToCJSPath(this.esmPath);
-    }
-
-    get path() {
-      const packageObj = packageManager.packages.get(".");
-      return packageObj.type === "commonjs" ? this.cjsPath : this.esmPath;
-    }
 }
 
-module.exports = BarrelFileManager;
+const barrelFilesPackagesManager = new BarrelFilesPackagesManager();
+
+module.exports = BarrelFileManagerFacade;
