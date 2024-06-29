@@ -4,7 +4,12 @@ const fs = require("fs");
 const nodeModulesFolder = {};
 
 class PathFunctions {
+    static isObject(val) {
+      return typeof val === "object" && val !== null && !Array.isArray(val);
+    }
+
     static isObjectEmpty(obj) {
+      if (!PathFunctions.isObject(obj)) throw new TypeError("The type is not an object");
       if (typeof obj === 'object' && Object.keys(obj).length !== 0) {
         return false;
       } else {
@@ -17,6 +22,12 @@ class PathFunctions {
           return !fs.accessSync(path, fs.constants.F_OK);
       } catch (e) {
           return false;
+      }
+    }
+
+    static createFolderIfNotExists(folderPath) {
+      if (!fs.existsSync(folderPath)) {
+          fs.mkdirSync(folderPath);
       }
     }
 
@@ -33,13 +44,13 @@ class PathFunctions {
     }
   
     static isRelativePath(path) {
-      return path.match(/^\.{0,2}\//);
+      const relativePathRegExp = /^\.{1,2}\//;
+      return relativePathRegExp.test(path);
     }
     
     static isRegularPath(path) {
       const regularPathRegExp = /^\.$|^\.[\\\/]|^\.\.$|^\.\.[\/\\]|^\/|^[A-Z]:[\\\/]/i;
-      const isRegularPath = regularPathRegExp.test(path);
-      return isRegularPath;
+      return regularPathRegExp.test(path);
     }
 
     static isNodeModule(path) {
@@ -48,7 +59,7 @@ class PathFunctions {
     }
 
     static removeLastSegment(path) {
-      return path.substring(0, path.lastIndexOf(ospath.sep));
+      return path.substring(0, ospath.normalize(path).lastIndexOf(ospath.sep));
     }    
   
     static getAbsolutePath(path, from=process.cwd()) {
