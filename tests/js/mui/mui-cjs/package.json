@@ -1,0 +1,17 @@
+{
+  "name": "mui-tests-cjs",
+  "version": "1.0.0",
+  "main": "mui-cjs.test.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.24.6",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0"
+  },
+  "scripts": {
+    "test": "jest --config=../../../jest.config.js"
+  },
+  "dependencies": {
+    "@mui/icons-material": "^5.0.5"
+  }
+}

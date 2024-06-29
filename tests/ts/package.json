@@ -1,0 +1,17 @@
+{
+  "name": "typescript-tests",
+  "version": "1.0.0",
+  "main": "imports.test.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.24.6",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0"
+  },
+  "scripts": {
+    "test": "jest --config=../jest.config.js"
+  },
+  "dependencies": {
+    "mongoose": "^8.4.0"
+  }
+}
