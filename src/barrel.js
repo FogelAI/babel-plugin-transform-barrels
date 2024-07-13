@@ -7,10 +7,74 @@ const { Package, packageManager } = require("./packages");
 const Cache = require("./cache");
 const pluginOptions = require("./pluginOptions");
 
+class DefaultPatternExport {
+  constructor() {
+    this.esmPath = "";
+    this.type = "";
+    this.localName = "";
+    this.exportedName = "";
+    this.isDefaultPatternCreated = false;
+    this.numOfDefaultPatternUsed = 0;
+    this.firstSpecifier = undefined;
+  }
+
+  getSpecifierPattern(specifierObj) {
+    const esmPath = this.getEsmPathPattern(specifierObj.esmPath, specifierObj.exportedName);
+    const type = specifierObj.type;
+    const localName = type !=="namespace" && specifierObj.localName.replaceAll(specifierObj.exportedName, "${specifier}");
+    const exportedName = specifierObj.exportedName.replaceAll(specifierObj.exportedName, "${specifier}");
+    return { esmPath, type, localName, exportedName };
+  }
+
+  createDefaultPattern(specifierObj) {
+    const specifierPattern = this.getSpecifierPattern(specifierObj);
+    if (!specifierPattern.esmPath.includes("${specifier}")) return;
+    this.firstSpecifier = specifierObj;
+    this.esmPath = specifierPattern.esmPath;
+    this.type = specifierPattern.type;
+    this.localName = specifierPattern.localName;
+    this.exportedName = specifierPattern.exportedName;
+  }
+
+  getEsmPathPattern(esmPath, specifierName) {
+    const regexPattern = `\\b${specifierName}\\b`;
+    const regex = new RegExp(regexPattern, "g");
+    const pathPattern = esmPath.replace(regex, "${specifier}");
+    return pathPattern;
+  }
+
+  isMatchDefaultPattern(specifierObj) {
+    if (!this.isDefaultPatternCreated) {
+      this.isDefaultPatternCreated = true;
+      this.createDefaultPattern(specifierObj);
+    }
+    if (this.esmPath === "") return false;
+    const specifierPattern = this.getSpecifierPattern(specifierObj);
+    const isMatch = specifierPattern.esmPath === this.esmPath && 
+                    specifierPattern.type === this.type &&
+                    specifierPattern.exportedName === this.exportedName &&
+                    specifierPattern.localName === this.localName;
+    if (isMatch) {
+      this.numOfDefaultPatternUsed += 1;
+    }
+    return isMatch;
+  }
+
+  getSpecifier(exportedName) {
+    const specifierObj = SpecifierFactory.createSpecifier("export");
+    specifierObj.esmPath = this.esmPath.replaceAll("${specifier}", exportedName);
+    specifierObj.type = this.type;
+    specifierObj.localName = this.localName.replaceAll("${specifier}", exportedName);
+    specifierObj.exportedName = this.exportedName.replaceAll("${specifier}", exportedName);
+    return specifierObj;
+  }
+}
+
 class BarrelFile {
     constructor(path) {
         this.path = path;
         this.exportMapping = {};
+        this.defaultPatternExport = new DefaultPatternExport();
         this.importMapping = {};
     }
 
@@ -20,8 +84,15 @@ class BarrelFile {
     }    
 
     get isBarrelFileContent() {
-        return !PathFunctions.isObjectEmpty(this.exportMapping);
+        return !PathFunctions.isObjectEmpty(this.exportMapping) || this.defaultPatternExport.isDefaultPatternCreated;
     }    
+
+    resetProperties() {
+      this.exportMapping = {};
+      this.defaultPatternExport = new DefaultPatternExport();
+      this.importMapping = {};
+      this.defaultPatternExport.numOfDefaultPatternUsed = 0;
+    }
 
     handleExportNamedDeclaration(node) {
         if (node.specifiers.length > 0) {
@@ -43,7 +114,11 @@ class BarrelFile {
               }
             }
             const { exportedName } = specifierObj;
-            this.exportMapping[exportedName] = this.getDeepestDirectSpecifierObject(specifierObj);
+            const deepestDirectSpecifier = this.getDeepestDirectSpecifierObject(specifierObj);
+            deepestDirectSpecifier.esmPath = PathFunctions.normalizeModulePath(deepestDirectSpecifier.esmPath);
+            if (!this.defaultPatternExport.isMatchDefaultPattern(deepestDirectSpecifier)) {
+              this.exportMapping[exportedName] = deepestDirectSpecifier;
+            }
           });
         };
         if (node.declaration) {
@@ -57,7 +132,10 @@ class BarrelFile {
             specifierObj.localName = declaration.id.name;
             specifierObj.exportedName = declaration.id.name;
             const { exportedName } = specifierObj;
-            this.exportMapping[exportedName] = this.getDeepestDirectSpecifierObject(specifierObj);    
+            specifierObj.esmPath = PathFunctions.normalizeModulePath(specifierObj.esmPath);
+            if (!this.defaultPatternExport.isMatchDefaultPattern(specifierObj)) {
+              this.exportMapping[exportedName] = specifierObj;
+            }
           });
         }
     }
@@ -70,7 +148,11 @@ class BarrelFile {
             const specifierObj = this.importMapping[localName].toExportSpecifier();
             specifierObj.exportedName = "default";
             const { exportedName } = specifierObj;
-            this.exportMapping[exportedName] = this.getDeepestDirectSpecifierObject(specifierObj);
+            const deepestDirectSpecifier = this.getDeepestDirectSpecifierObject(specifierObj);
+            deepestDirectSpecifier.esmPath = PathFunctions.normalizeModulePath(deepestDirectSpecifier.esmPath);
+            if (!this.defaultPatternExport.isMatchDefaultPattern(deepestDirectSpecifier)) {
+              this.exportMapping[exportedName] = deepestDirectSpecifier;
+            }
           }
         }
     }
@@ -80,6 +162,7 @@ class BarrelFile {
         const exportPath = node.source.value;
         let absoluteExportedPath = resolver.resolve(exportPath, this.path).absEsmFile;
         const exportedAllFile = new BarrelFile(absoluteExportedPath);
+        exportedAllFile.defaultPatternExport.isDefaultPatternCreated = true;
         exportedAllFile.createSpecifiersMapping(true);
         Object.assign(this.exportMapping, exportedAllFile.exportMapping);
     }
@@ -107,7 +190,7 @@ class BarrelFile {
             // export function abc(){};
             // export const abc = 5, def = 10;
             if (node.declaration && !forceFullScan) {
-              this.exportMapping = {};
+              this.resetProperties();
               return false;
             }  
             this.handleExportNamedDeclaration(node);
@@ -120,7 +203,7 @@ class BarrelFile {
           } else if (t.isImportDeclaration(node)) {
             if (!AST.isAnySpecifierExist(node.specifiers) && !forceFullScan) {
             // import './abc';
-              this.exportMapping = {};
+              this.resetProperties();
               return false;
             }
             // import {abc, def} from './abc';
@@ -129,13 +212,21 @@ class BarrelFile {
             if (forceFullScan) {
               return true;
             } else {
-              this.exportMapping = {};
+              this.resetProperties();
               return false;  
             }
           }
           return true;
         });
         this.path = PathFunctions.normalizeModulePath(this.path);
+        if (this.defaultPatternExport.numOfDefaultPatternUsed === 1) {
+          this.exportMapping[this.defaultPatternExport.firstSpecifier.exportedName] = this.defaultPatternExport.firstSpecifier;
+          this.defaultPatternExport = new DefaultPatternExport();
+          this.defaultPatternExport.isDefaultPatternCreated = true;
+        }
+        delete this.defaultPatternExport.numOfDefaultPatternUsed;
+        delete this.defaultPatternExport.firstSpecifier;
+        delete this.importMapping;
     }    
 
     getDeepestDirectSpecifierObject(specifierObj) {
@@ -147,12 +238,13 @@ class BarrelFile {
             return this.getDeepestDirectSpecifierObject(deepestSpecifier);
           }  
         }
-        specifierObj.esmPath = PathFunctions.normalizeModulePath(specifierObj.esmPath);
         return specifierObj;
     }
 
     getDirectSpecifierObject(specifierExportedName) {
-        return this.exportMapping[specifierExportedName];
+      return this.exportMapping[specifierExportedName] ?
+          this.exportMapping[specifierExportedName] : 
+          this.defaultPatternExport.getSpecifier(specifierExportedName);
     }    
 }
 
@@ -185,6 +277,7 @@ class BarrelFilesPackageCacheStrategy {
       for (const [exportMappingKey, exportMappingValue] of Object.entries(value.exportMapping)) {
         barrelFile.exportMapping[exportMappingKey] = Object.assign(SpecifierFactory.createSpecifier("export"), exportMappingValue);
       }
+      barrelFile.defaultPatternExport = Object.assign(new DefaultPatternExport(), value.defaultPatternExport);
       barrelFiles.set(key, barrelFile);
     }
     return barrelFiles;

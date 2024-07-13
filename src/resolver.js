@@ -7,10 +7,17 @@ class Resolver {
     constructor() {
         this.aliasObj = {};
         this.from = "";
+        const defaultExtensions = ["", ".js", ".jsx", ".ts", ".tsx"];
+        this.extensions = defaultExtensions;
         if (instance) {
           throw new Error("You can only create one instance!");
         }
         instance = this;  
+    }
+
+    setExtensions(extensions) {
+      this.extensions = extensions;
+      this.extensions.unshift("");
     }
 
     getTargetPathType(target, from) {
@@ -26,8 +33,7 @@ class Resolver {
         const fromDir = ospath.dirname(from);
         const absolutePath = PathFunctions.getAbsolutePath(originalPath, fromDir);
         if (!absolutePath) return;
-        const extensions = ["", ".js", ".jsx", ".ts", ".tsx"];
-        const filePath = this.getFilePathWithExtension(absolutePath, extensions);
+        const filePath = this.getFilePathWithExtension(absolutePath);
         if (filePath) {
           const resolvedPath = new ResolvedPath();
           if (this.getTargetPathType(absolutePath, from) === "ESM") {
@@ -51,8 +57,8 @@ class Resolver {
         };
     }    
 
-    getFilePathWithExtension(path, extensions) {
-      const ext = extensions.find((ext)=> PathFunctions.fileExists(path + ext));
+    getFilePathWithExtension(path) {
+      const ext = this.extensions.find((ext)=> PathFunctions.fileExists(path + ext));
       if (ext === undefined) return null;
       const resolvedPath = path + ext;
       return resolvedPath;
@@ -69,17 +75,15 @@ class Resolver {
           const absCjsModule = cjsModule && ospath.join(path, cjsModule);
           const absEsmModule = esmModule && ospath.join(path, esmModule);
           const resolvedPath = new ResolvedPath();
-          const extensions = ["", ".js", ".jsx", ".ts", ".tsx"];
-          resolvedPath.absCjsFile = absCjsModule ? this.getFilePathWithExtension(absCjsModule, extensions) : ""
-          resolvedPath.absEsmFile = absEsmModule ? this.getFilePathWithExtension(absEsmModule, extensions) : ""
+          resolvedPath.absCjsFile = absCjsModule ? this.getFilePathWithExtension(absCjsModule) : ""
+          resolvedPath.absEsmFile = absEsmModule ? this.getFilePathWithExtension(absEsmModule) : ""
           return resolvedPath;
       }
     }  
 
     getIndexFilePath(path) {
-      const extensions = [".js", ".jsx", ".ts", ".tsx"];
       let indexFilePath = ospath.join(path, "index");
-      indexFilePath = this.getFilePathWithExtension(indexFilePath, extensions);
+      indexFilePath = this.getFilePathWithExtension(indexFilePath);
       return indexFilePath;
     }  
 

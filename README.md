@@ -59,11 +59,13 @@ import { List } from './components/List/List'
 
 ## Options
 
-|     **Name**     |  **Type** | **Default** |                                    **Description**                                   |
-|:----------------:|:---------:|:-----------:|:------------------------------------------------------------------------------------:|
-|  `webpackAlias`  |  `object` |     `{}`    |     It should be assigned with the `alias` value option from the Webpack config.     |
-|    `jestAlias`   |  `array`  |     `[]`    | It should be assigned with the `moduleNameMapper` value option from the Jest config. |
-| `isCacheEnabled` | `boolean` |   `false`   |                         If `true`, enables file-based cache.                         |
+|       **Name**      |  **Type** |            **Default**           |                                      **Description**                                     |
+|:-------------------:|:---------:|:--------------------------------:|:----------------------------------------------------------------------------------------:|
+|    `webpackAlias`   |  `object` |               `{}`               |       It should be assigned with the `alias` value option from the Webpack config.       |
+|     `jestAlias`     |  `array`  |               `[]`               |   It should be assigned with the `moduleNameMapper` value option from the Jest config.   |
+|   `jestExtensions`  |  `array`  |   `["js", "jsx", "ts", "tsx"]`   | It should be assigned with the `moduleFileExtensions` value option from the Jest config. |
+| `webpackExtensions` |  `array`  | `[".js", ".jsx", ".ts", ".tsx"]` |     It should be assigned with the `extensions` value option from the Webpack config.    |
+|   `isCacheEnabled`  | `boolean` |              `false`             |                           If `true`, enables file-based cache.                           |
 
 ## The Problem
 

@@ -3,8 +3,11 @@ let instance;
 class PluginOptions {
     constructor() {
         this.options = {
+            executorName: "",
             webpackAlias: {},
+            webpackExtensions: [".js", ".jsx", ".ts", ".tsx"],
             jestAlias: [],
+            jestExtensions: ["js", "jsx", "ts", "tsx"],
             isCacheEnabled: false
         };
         if (instance) {
@@ -14,10 +17,21 @@ class PluginOptions {
     }
 
     setOptions(options) {
+        this.executorName = this.getExecutorName(options);
         this.options= {
             ...this.options,
             ...options
         };
+    }
+
+    getExecutorName(options) {
+        if (options.webpackAlias || options.webpackExtensions) {
+            return "webpack";
+        } else if (options.jestAlias || options.jestExtensions) {
+            return "jest";
+        } else {
+            return "";
+        }
     }
 }
 

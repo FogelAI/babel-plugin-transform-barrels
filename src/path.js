@@ -16,6 +16,13 @@ class PathFunctions {
         return true;
       }
     }
+
+    static isArrayEmpty(arr) {
+      if (Array.isArray(arr) && !arr.length) {
+        return true;
+      }
+      return false;
+    }
   
     static pathExists(path) {
       try {

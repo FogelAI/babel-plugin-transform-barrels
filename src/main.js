@@ -1,5 +1,5 @@
 const AST = require("./ast");
-const AliasFactory = require("./alias");
+const ExecutorFactory = require("./executorConfig");
 const resolver = require("./resolver");
 const BarrelFileManagerFacade = require("./barrel");
 const pluginOptions = require("./pluginOptions");
@@ -33,15 +33,23 @@ module.exports = function (babel) {
       const plugins = state.opts.plugins;
       const plugin = plugins.find(plugin => plugin.key === PLUGIN_KEY);
       pluginOptions.setOptions(plugin.options);
-      const aliasJest = AliasFactory.createAlias("jest", pluginOptions.options);
-      const aliasWebpack = AliasFactory.createAlias("webpack", pluginOptions.options);
-      const aliasWorkspaces = AliasFactory.createAlias("workspaces");
+      const { options } = pluginOptions;
+      const workspaces = ExecutorFactory.createExecutor("workspaces");
+      let executor;
+      if (pluginOptions.executorName === "webpack") {
+        executor = ExecutorFactory.createExecutor("webpack", options.webpackAlias, options.webpackExtensions);
+      } else if (pluginOptions.executorName === "jest") {
+        executor = ExecutorFactory.createExecutor("jest", options.jestAlias, options.jestExtensions);
+      } else {
+        executor = ExecutorFactory.createExecutor();
+      }
       const alias = {
-        ...aliasWebpack.getAlias(),
-        ...aliasWorkspaces.getAlias(),
-        ...aliasJest.getAlias()
+        ...workspaces.getAlias(),
+        ...executor.getAlias()
       }
       resolver.appendAlias(alias);
+      const extensions = executor.getExtensions();
+      extensions.length !==0 && resolver.setExtensions(extensions)
     },
     post(state) {
       BarrelFileManagerFacade.saveToCacheAllPackagesBarrelFiles();
