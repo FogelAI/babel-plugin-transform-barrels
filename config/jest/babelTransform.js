@@ -3,9 +3,10 @@ const babelJest = require("babel-jest").default;
 module.exports = {
   process(sourceText, sourcePath, options) {
     const alias = options?.config?.moduleNameMapper;
+    const extensions = options.config.moduleFileExtensions;
     const babelTransformer = babelJest.createTransformer({
       presets: [["@babel/preset-react"], ["@babel/preset-env"]],
-      plugins: [["transform-barrels", { jestAlias: alias }]],
+      plugins: [["transform-barrels", { jestAlias: alias, jestExtensions: extensions }]],
       babelrc: false,
       configFile: false,
     });
