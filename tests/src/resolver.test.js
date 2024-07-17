@@ -32,6 +32,44 @@ describe('Resolver class', () => {
             expect(result).toEqual(expectedResult);
         });
     
+        test('when resolving a relative path from a regular path, it should return a ResolvedPath instance where absEsmFile contains the file path with mjs extension', () => {
+            // Arrange
+            mock({
+                "c:\\path\\to.mjs": "",
+            });
+            const path = "./to";
+            const from = "c:\\path\\from.js";
+            const expectedResult = {
+                absCjsFile: "",
+                absEsmFile: "c:\\path\\to.mjs"
+            }
+    
+            // Act
+            const result = resolver.resolve(path,from);
+    
+            // Assert
+            expect(result).toEqual(expectedResult);
+        });
+
+        test('when resolving a relative path from a regular path, it should return a ResolvedPath instance where absCjsFile contains the file path with cjs extension', () => {
+            // Arrange
+            mock({
+                "c:\\path\\to.cjs": "",
+            });
+            const path = "./to";
+            const from = "c:\\path\\from.js";
+            const expectedResult = {
+                absCjsFile: "c:\\path\\to.cjs",
+                absEsmFile: ""
+            }
+    
+            // Act
+            const result = resolver.resolve(path,from);
+    
+            // Assert
+            expect(result).toEqual(expectedResult);
+        });
+
         test('when resolving a package from a regular path, it should return a ResolvedPath instance where absEsmFile and absCjsFile include file paths of the module and main keys (if they exist) from the package.json file', () => {
             // Arrange
             mock({
