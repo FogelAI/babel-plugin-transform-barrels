@@ -13,7 +13,8 @@
     "test": "jest --clearCache && jest --config=jest.config.js"
   },
   "dependencies": {
-    "@mui/icons-material": "^5.15.20"
+    "@mui/icons-material": "^5.15.20",
+    "graphql": "^16.9.0"
   },
   "workspaces": [
     "./*"
