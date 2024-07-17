@@ -7,7 +7,7 @@ class Resolver {
     constructor() {
         this.aliasObj = {};
         this.from = "";
-        const defaultExtensions = ["", ".js", ".jsx", ".ts", ".tsx"];
+        const defaultExtensions = ["", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"];
         this.extensions = defaultExtensions;
         if (instance) {
           throw new Error("You can only create one instance!");
@@ -20,8 +20,16 @@ class Resolver {
       this.extensions.unshift("");
     }
 
+    isExtensionFile(path, ext) {
+      const extFilePathRegex = new RegExp(`\.(${ext})$`);
+      return extFilePathRegex.test(path.toLowerCase());  
+    }
+
     getTargetPathType(target, from) {
-      if (!PathFunctions.isNodeModule(from) && PathFunctions.isNodeModule(target)) {
+      // if(isFromLocal && isToPackage) isCJS
+      // if(isFromLocal && isToLocal) isESM
+      // if(isFromPackage && isToPackage) isESM
+      if (this.isExtensionFile(target, "cjs") || (!PathFunctions.isNodeModule(from) && PathFunctions.isNodeModule(target) && !this.isExtensionFile(target, "mjs"))) {
         return "CJS";
       } else {
         return "ESM";
@@ -36,7 +44,7 @@ class Resolver {
         const filePath = this.getFilePathWithExtension(absolutePath);
         if (filePath) {
           const resolvedPath = new ResolvedPath();
-          if (this.getTargetPathType(absolutePath, from) === "ESM") {
+          if (this.getTargetPathType(filePath, from) === "ESM") {
             resolvedPath.absEsmFile = filePath;
           } else {
             resolvedPath.absCjsFile = filePath;
@@ -48,7 +56,7 @@ class Resolver {
         const indexPath = this.getIndexFilePath(absolutePath);
         if (indexPath) {
           const resolvedPath = new ResolvedPath();
-          if (this.getTargetPathType(absolutePath, from) === "ESM") {
+          if (this.getTargetPathType(indexPath, from) === "ESM") {
             resolvedPath.absEsmFile = indexPath;
           } else {
             resolvedPath.absCjsFile = indexPath;
@@ -59,6 +67,7 @@ class Resolver {
 
     getFilePathWithExtension(path) {
       const ext = this.extensions.find((ext)=> PathFunctions.fileExists(path + ext));
+      // can't use "if (!ext)" because ext can be equal to empty string that in this case should be true, but for javascript it's false
       if (ext === undefined) return null;
       const resolvedPath = path + ext;
       return resolvedPath;

@@ -5,9 +5,9 @@ class PluginOptions {
         this.options = {
             executorName: "",
             webpackAlias: {},
-            webpackExtensions: [".js", ".jsx", ".ts", ".tsx"],
+            webpackExtensions: [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"],
             jestAlias: [],
-            jestExtensions: ["js", "jsx", "ts", "tsx"],
+            jestExtensions: ["js", "jsx", ".mjs", ".cjs", "ts", "tsx"],
             isCacheEnabled: false
         };
         if (instance) {

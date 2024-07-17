@@ -80,7 +80,7 @@ class BarrelFile {
 
     static isBarrelFilename(path) {
       const barrelFileRegex = new RegExp(`index\.(js|mjs|jsx|ts|tsx)$`);
-      return barrelFileRegex.test(path);  
+      return barrelFileRegex.test(path.toLowerCase());  
     }    
 
     get isBarrelFileContent() {
@@ -378,7 +378,7 @@ class Specifier {
 
   get path() {
     const packageObj = packageManager.getNearestPackageJsonContent();
-    return packageObj?.type === "module" ? this.esmPath : this.cjsPath;
+    return (!PathFunctions.isNodeModule(this.esmPath) || packageObj?.type === "module") ? this.esmPath : this.cjsPath;
   }
 }
 

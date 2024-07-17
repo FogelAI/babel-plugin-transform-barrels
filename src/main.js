@@ -1,3 +1,4 @@
+const { builtinModules } = require('module');
 const AST = require("./ast");
 const ExecutorFactory = require("./executorConfig");
 const resolver = require("./resolver");
@@ -10,6 +11,7 @@ const importDeclarationVisitor = (path, state) => {
   if (AST.getSpecifierType(importsSpecifiers[0]) === "namespace") return;
   const parsedJSFile = state.filename;
   const importsPath = path.node.source.value;
+  if (builtinModules.includes(importsPath)) return;
   resolver.from = parsedJSFile;
   const resolvedPathObject = resolver.resolve(importsPath ,parsedJSFile);
   const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);

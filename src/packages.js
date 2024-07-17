@@ -43,7 +43,11 @@ class Package {
     }
 
     get cjsEntry() {
-        return this.data.main && ospath.join(this.name, this.data.main);
+        if (this.data.main) {
+            const cjsFolder = ospath.dirname(this.path);
+            const fullPath = resolver.resolve(ospath.join(cjsFolder, this.data.main), this.path).esmFile;
+            return PathFunctions.normalizeModulePath(fullPath);
+        }
     }
 
     get esmEntry() {
@@ -58,6 +62,14 @@ class Package {
         return this.esmEntry && ospath.dirname(this.esmEntry)
     }
 
+    get cjsExtension() {
+        return this.cjsEntry && ospath.extname(this.cjsEntry)
+    }
+
+    get esmExtension() {
+        return this.esmEntry && ospath.extname(this.esmEntry)
+    }
+
     get type() {
         return this.data.type || "commonjs";
     }
@@ -67,7 +79,8 @@ class Package {
     }
 
     convertESMToCJSPath(path) {
-        return path.replace(this.esmFolder, this.cjsFolder);
+        const replacedPathExt = PathFunctions.replaceFileExtension(path, this.cjsExtension);
+        return replacedPathExt.replace(this.esmFolder, this.cjsFolder);
     }
 
     load() {

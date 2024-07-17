@@ -1,6 +1,6 @@
 {
   "name": "babel-plugin-transform-barrels",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "A Babel plugin that transforms indirect imports through a barrel file (index.js) into direct imports.",
   "homepage": "https://github.com/FogelAI/babel-plugin-transform-barrels",
   "main": "src/main.js",
