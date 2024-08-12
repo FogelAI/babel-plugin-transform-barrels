@@ -58,14 +58,17 @@ class Workspaces {
 
 class ExecutorConfig {
     constructor(alias, extensions, loadStrategy) {
-      this.alias = alias || [];
+      this.alias = alias || {};
       this.extensions = extensions || [];
       this.loadStrategy = loadStrategy;
     }
   
     load() {
-        this.alias = this.loadStrategy.prepareAlias(this.alias)
-        this.extensions = this.loadStrategy.prepareExtensions(this.extensions)
+        if (this.loadStrategy) {
+          this.alias = this.loadStrategy.prepareAlias(this.alias)
+          this.extensions = this.loadStrategy.prepareExtensions(this.extensions)  
+        }
+        this.addWorkspacesToAlias();
     }
 
     getAlias() {
@@ -75,6 +78,15 @@ class ExecutorConfig {
     getExtensions() {
         return this.extensions;
     }  
+
+    addWorkspacesToAlias() {
+      const workspaces = new Workspaces();
+      workspaces.load();
+      this.alias = {
+        ...workspaces.getAlias(),
+        ...this.getAlias()
+      }
+    }
 }
 
 class WebpackStrategy {
@@ -109,11 +121,11 @@ class ViteStrategy {
 
 class JestStrategy {
     prepareExtensions(extensions) {
-        return extensions.map(ext => `.${ext}`);
+        return extensions.map(ext => ext.startsWith(".") ? ext : `.${ext}`);
     }
 
     prepareAlias(alias) {
-        return Object.fromEntries(alias);
+        return Array.isArray(alias) ? Object.fromEntries(alias) : alias;
     }
 }
 
@@ -132,12 +144,9 @@ class ExecutorFactory {
           const jest = new ExecutorConfig(alias, extensions, new JestStrategy());
           jest.load();
           return jest;
-        case 'workspaces':
-          const workspaces = new Workspaces();
-          workspaces.load();
-          return workspaces;    
         default:
           const defaultExecutor = new ExecutorConfig();
+          defaultExecutor.load();
           return defaultExecutor;
       }
     }

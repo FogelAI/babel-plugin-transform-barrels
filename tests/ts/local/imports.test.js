@@ -4,7 +4,7 @@ const ospath = require("path");
 describe('typescript transformation', () => {
   test("transformation of a named import - jest", () => {
     const extensions = ["ts", "tsx"];
-    const pluginOptions = { jestExtensions: extensions };
+    const pluginOptions = { executorName: "jest", extensions: extensions };
     expect(
       pluginTransform(
         'import {namedExport} from "./components";',
@@ -18,7 +18,7 @@ describe('typescript transformation', () => {
   
   test("transformation of a named import - vite", () => {
     const extensions = [".ts", ".tsx"];
-    const pluginOptions = { viteExtensions: extensions };
+    const pluginOptions = { executorName: "vite", extensions: extensions };
     expect(
       pluginTransform(
         'import {namedExport} from "./components";',
@@ -32,7 +32,7 @@ describe('typescript transformation', () => {
 
   test("transformation of a named import that was originally re-exported from a default export in the barrel file - webpack", () => {
     const extensions = [".ts", ".tsx"];
-    const pluginOptions = { webpackExtensions: extensions };
+    const pluginOptions = { executorName: "webpack", extensions: extensions };
     expect(
       pluginTransform(
         'import {defaultExport} from "./components";',

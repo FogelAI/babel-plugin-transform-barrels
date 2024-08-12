@@ -2,14 +2,10 @@ let instance;
 
 class PluginOptions {
     constructor() {
-        this.executorName = "";
         this.options = {
-            webpackAlias: {},
-            webpackExtensions: [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"],
-            viteAlias: {},
-            viteExtensions: [".mjs", ".js", ".mts", ".ts", ".jsx", ".tsx", ".json"],
-            jestAlias: [],
-            jestExtensions: ["js", "jsx", ".mjs", ".cjs", "ts", "tsx"],
+            executorName: "other",
+            alias: {},
+            extensions: [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"],
             isCacheEnabled: false,
             logging: {
                 type: "disabled",
@@ -23,23 +19,10 @@ class PluginOptions {
     }
 
     setOptions(options) {
-        this.executorName = this.getExecutorName(options);
         this.options= {
             ...this.options,
             ...options
         };
-    }
-
-    getExecutorName(options) {
-        if (options.webpackAlias || options.webpackExtensions) {
-            return "webpack";
-        } else if (options.viteAlias || options.viteExtensions) {
-            return "vite";
-        } else if (options.jestAlias || options.jestExtensions) {
-            return "jest";
-        } else {
-            return "";
-        }
     }
 }
 

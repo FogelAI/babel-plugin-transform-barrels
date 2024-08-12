@@ -6,7 +6,7 @@ module.exports = {
     const extensions = options.config.moduleFileExtensions;
     const babelTransformer = babelJest.createTransformer({
       presets: [["@babel/preset-react"], ["@babel/preset-env"]],
-      plugins: [["transform-barrels", { jestAlias: alias, jestExtensions: extensions }]],
+      plugins: [["transform-barrels", { executorName: "jest", alias: alias, extensions: extensions }]],
       babelrc: false,
       configFile: false,
     });

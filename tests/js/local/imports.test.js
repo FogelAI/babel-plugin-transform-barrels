@@ -60,7 +60,7 @@ describe("aliases", () => {
     const alias = {
       components: ospath.resolve(__dirname, 'components'),
     }
-    const pluginOptions = { webpackAlias: alias };
+    const pluginOptions = { executorName: "webpack", alias: alias };
     expect(
       pluginTransform(
         'import { Text } from "components/Texts";',
@@ -76,7 +76,7 @@ describe("aliases", () => {
     const alias = {
       components: ospath.resolve(__dirname, 'components'),
     }
-    const pluginOptions = { viteAlias: alias };
+    const pluginOptions = { executorName: "vite", alias: alias };
     expect(
       pluginTransform(
         'import { Text } from "components/Texts";',
@@ -92,7 +92,7 @@ describe("aliases", () => {
     const alias = Object.entries({
       "^abc/(.*)$": "./components/$1"
     });
-    const pluginOptions = { jestAlias: alias };
+    const pluginOptions = { executorName: "jest", alias: alias };
     expect(
       pluginTransform(
         'import { Text } from "abc/Texts";',

@@ -19,7 +19,7 @@ describe("third-party package (@mui/icons-material) transformation for CommonJS"
       const alias = {
         icons: "@mui/icons-material",
       }
-      const pluginOptions = { webpackAlias: alias, isCacheEnabled: true };
+      const pluginOptions = { executorName: "webpack", alias: alias, isCacheEnabled: true };
       expect(
         pluginTransform(
           'import { ZoomIn } from "icons";',

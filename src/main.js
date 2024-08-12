@@ -13,7 +13,7 @@ const importDeclarationVisitor = (path, state) => {
   if (AST.getSpecifierType(importsSpecifiers[0]) === "namespace") return;
   const parsedJSFile = state.filename;
   const importsPath = path.node.source.value;
-  if (importsPath.startsWith("/") || importsPath.startsWith("\\")) return;
+  if (pluginOptions.options.executorName === "vite" && importsPath.startsWith("/")) return;
   if (builtinModules.includes(importsPath)) return;
   logger.log(`Source import line: ${generate(path.node, { comments: false, concise: true }).code}`);
   resolver.from = parsedJSFile;
@@ -44,22 +44,8 @@ module.exports = function (babel) {
       const { options } = pluginOptions;
       logger.setOptions(options.logging);
       logger.log(`Processed Javascript file: ${state.opts.filename}`);
-      const workspaces = ExecutorFactory.createExecutor("workspaces");
-      let executor;
-      if (pluginOptions.executorName === "webpack") {
-        executor = ExecutorFactory.createExecutor("webpack", options.webpackAlias, options.webpackExtensions);
-      } else if (pluginOptions.executorName === "vite") {
-        executor = ExecutorFactory.createExecutor("vite", options.viteAlias, options.viteExtensions);
-      } else if (pluginOptions.executorName === "jest") {
-        executor = ExecutorFactory.createExecutor("jest", options.jestAlias, options.jestExtensions);
-      } else {
-        executor = ExecutorFactory.createExecutor();
-      }
-      const alias = {
-        ...workspaces.getAlias(),
-        ...executor.getAlias()
-      }
-      resolver.appendAlias(alias);
+      const executor = ExecutorFactory.createExecutor(options.executorName, options.alias, options.extensions);
+      resolver.appendAlias(executor.getAlias());
       const extensions = executor.getExtensions();
       extensions.length !==0 && resolver.setExtensions(extensions)
     },

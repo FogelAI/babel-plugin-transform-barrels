@@ -19,7 +19,7 @@ describe("third-party package (@ant-design/icons) transformation for CommonJS", 
       const alias = {
         icons: "@ant-design/icons",
       }
-      const pluginOptions = { webpackAlias: alias, isCacheEnabled: true };
+      const pluginOptions = { executorName: "webpack", alias: alias, isCacheEnabled: true };
       expect(
         pluginTransform(
           'import { ZoomInOutlined } from "icons";',

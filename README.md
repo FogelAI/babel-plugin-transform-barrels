@@ -6,7 +6,7 @@
 This Babel plugin transforms indirect imports through a barrel file (index.js) into direct imports.
 
 ### Note
-This plugin is intended for developers who use barrel files (index.js) with dynamic imports and/or CSS imports in their code when using the Webpack bundler or Jest. I don't know if it's needed to use in other bundlers such as Parcel, Rollup Vite and etc.
+This plugin is intended for developers who use barrel files (index.js) with the Webpack or Vite bundlers, or when running tests with Jest. I don't know if it's beneficial to use with other bundlers such as Parcel, Rollup, etc.
 
 ## Example
 
@@ -59,16 +59,13 @@ import { List } from './components/List/List'
 
 ## Options
 
-|       **Name**      |  **Type** |                        **Default**                        |                                                                                            **Description**                                                                                           |
-|:-------------------:|:---------:|:---------------------------------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-|    `webpackAlias`   |  `object` |                            `{}`                           |                                                             It should be assigned with the `alias` value option from the Webpack config.                                                             |
-|     `viteAlias`     |  `object` |                            `{}`                           |                                                               It should be assigned with the `alias` value option from the Vite config.                                                              |
-|     `jestAlias`     |  `array`  |                            `[]`                           |                                                         It should be assigned with the `moduleNameMapper` value option from the Jest config.                                                         |
-| `webpackExtensions` |  `array`  |              `[".js", ".jsx", ".ts", ".tsx"]`             |                                                           It should be assigned with the `extensions` value option from the Webpack config.                                                          |
-|   `viteExtensions`  |  `array`  | `[".mjs", ".js", ".mts", ".ts", ".jsx", ".tsx", ".json"]` |                                                            It should be assigned with the `extensions` value option from the Vite config.                                                            |
-|   `jestExtensions`  |  `array`  |                `["js", "jsx", "ts", "tsx"]`               |                                                       It should be assigned with the `moduleFileExtensions` value option from the Jest config.                                                       |
-|   `isCacheEnabled`  | `boolean` |                          `false`                          |                                                                                 If `true`, enables file-based cache.                                                                                 |
-| `logging`           | `object`  | `{ type: "disabled", filePath: "log.txt" }`               | Specifies logging options.<br>`type` can be `disabled` for no logging, `file` for logs to a file, or `screen` for logs to the console.<br>If type is `file`, `filePath` specifies the log file path. |
+|     **Name**     |  **Type** |                    **Default**                   |                                                                                            **Description**                                                                                           |
+|:----------------:|:---------:|:------------------------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+|  `executorName`  |  `string` |                     `"other"`                    |                                                     It should be assigned with one of the supported executor values: `webpack`, `vite` or `jest`.                                                    |
+|      `alias`     |  `object` |                       `{}`                       |                                                             It should be assigned with the `alias` value option from the executor config.                                                            |
+|   `extensions`   |  `array`  | `[".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"]` |                                                          It should be assigned with the `extensions` value option from the executor config.                                                          |
+| `isCacheEnabled` | `boolean` |                      `false`                     |                                                                                 If `true`, enables file-based cache.                                                                                 |
+|     `logging`    |  `object` |    `{ type: "disabled", filePath: "log.txt" }`   | Specifies logging options.<br>`type` can be `disabled` for no logging, `file` for logs to a file, or `screen` for logs to the console.<br>If type is `file`, `filePath` specifies the log file path. |
 
 ## The Problem
 
