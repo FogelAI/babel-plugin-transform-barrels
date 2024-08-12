@@ -13,6 +13,7 @@
     "test": "jest --clearCache && jest --config=jest.config.js"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.3.3",
     "@mui/icons-material": "^5.15.20",
     "graphql": "^16.9.0"
   },
