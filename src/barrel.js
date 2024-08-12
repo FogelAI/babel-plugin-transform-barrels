@@ -91,7 +91,6 @@ class BarrelFile {
       this.exportMapping = {};
       this.defaultPatternExport = new DefaultPatternExport();
       this.importMapping = {};
-      this.defaultPatternExport.numOfDefaultPatternUsed = 0;
     }
 
     handleExportNamedDeclaration(node) {
@@ -222,7 +221,6 @@ class BarrelFile {
         if (this.defaultPatternExport.numOfDefaultPatternUsed === 1) {
           this.exportMapping[this.defaultPatternExport.firstSpecifier.exportedName] = this.defaultPatternExport.firstSpecifier;
           this.defaultPatternExport = new DefaultPatternExport();
-          this.defaultPatternExport.isDefaultPatternCreated = true;
         }
         delete this.defaultPatternExport.numOfDefaultPatternUsed;
         delete this.defaultPatternExport.firstSpecifier;

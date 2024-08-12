@@ -66,18 +66,10 @@ class PathFunctions {
     }
 
     static removeLastSegment(path) {
-      // path.split("\\").slice(0,-1).join("\\");
-      // substring is more performant than split, in a half of the time.
       return path.substring(0, ospath.normalize(path).lastIndexOf(ospath.sep));
     }    
   
     static getAbsolutePath(path, from=process.cwd()) {
-      // https://github.com/nodejs/node/blob/main/doc/api/modules.md#loading-from-node_modules-folders
-      // solution for require function for ES modules
-      // https://stackoverflow.com/questions/54977743/do-require-resolve-for-es-modules
-      // https://stackoverflow.com/a/50053801
-      // import { createRequire } from "module";
-      // const require = createRequire(import.meta.url);
       if (ospath.isAbsolute(path)) return path;
       let currentDir = from;
       if (!PathFunctions.isNodeModule(path)) return ospath.join(currentDir, path);

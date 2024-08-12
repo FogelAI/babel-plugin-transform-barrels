@@ -26,9 +26,6 @@ class Resolver {
     }
 
     getTargetPathType(target, from) {
-      // if(isFromLocal && isToPackage) isCJS
-      // if(isFromLocal && isToLocal) isESM
-      // if(isFromPackage && isToPackage) isESM
       if (this.isExtensionFile(target, "cjs") || (!PathFunctions.isNodeModule(from) && PathFunctions.isNodeModule(target) && !this.isExtensionFile(target, "mjs"))) {
         return "CJS";
       } else {
@@ -67,7 +64,6 @@ class Resolver {
 
     getFilePathWithExtension(path) {
       const ext = this.extensions.find((ext)=> PathFunctions.fileExists(path + ext));
-      // can't use "if (!ext)" because ext can be equal to empty string that in this case should be true, but for javascript it's false
       if (ext === undefined) return null;
       const resolvedPath = path + ext;
       return resolvedPath;
