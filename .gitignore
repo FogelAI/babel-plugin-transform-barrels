@@ -6,6 +6,7 @@ node_modules
 /dist
 package-lock.json
 babel-plugin-transform-barrels_cache
+log.txt
 
 # misc
 .DS_Store

@@ -11,6 +11,7 @@ node_modules
 package-lock.json
 yarn.lock
 babel-plugin-transform-barrels_cache
+log.txt
 
 
 # misc

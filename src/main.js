@@ -1,9 +1,11 @@
 const { builtinModules } = require('module');
+const generate = require('@babel/generator').default;
 const AST = require("./ast");
 const ExecutorFactory = require("./executorConfig");
 const resolver = require("./resolver");
 const BarrelFileManagerFacade = require("./barrel");
 const pluginOptions = require("./pluginOptions");
+const logger = require("./logger");
 
 const importDeclarationVisitor = (path, state) => {
   const importsSpecifiers = path.node.specifiers;
@@ -12,6 +14,7 @@ const importDeclarationVisitor = (path, state) => {
   const parsedJSFile = state.filename;
   const importsPath = path.node.source.value;
   if (builtinModules.includes(importsPath)) return;
+  logger.log(`Source import line: ${generate(path.node, { comments: false, concise: true }).code}`);
   resolver.from = parsedJSFile;
   const resolvedPathObject = resolver.resolve(importsPath ,parsedJSFile);
   const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);
@@ -21,7 +24,9 @@ const importDeclarationVisitor = (path, state) => {
       const importedName = specifier?.imported?.name || "default";
       const importSpecifier = barrelFile.getDirectSpecifierObject(importedName).toImportSpecifier();
       importSpecifier.localName = specifier.local.name;
-      return AST.createASTImportDeclaration(importSpecifier);
+      const transformedASTImport = AST.createASTImportDeclaration(importSpecifier);
+      logger.log(`Transformed import line: ${generate(transformedASTImport).code}`);
+      return transformedASTImport;
     }
   );
   path.replaceWithMultiple(directSpecifierASTArray);
@@ -36,6 +41,8 @@ module.exports = function (babel) {
       const plugin = plugins.find(plugin => plugin.key === PLUGIN_KEY);
       pluginOptions.setOptions(plugin.options);
       const { options } = pluginOptions;
+      logger.setOptions(options.logging);
+      logger.log(`Processed Javascript file: ${state.opts.filename}`);
       const workspaces = ExecutorFactory.createExecutor("workspaces");
       let executor;
       if (pluginOptions.executorName === "webpack") {

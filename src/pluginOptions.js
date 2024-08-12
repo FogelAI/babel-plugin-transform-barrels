@@ -8,7 +8,11 @@ class PluginOptions {
             webpackExtensions: [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"],
             jestAlias: [],
             jestExtensions: ["js", "jsx", ".mjs", ".cjs", "ts", "tsx"],
-            isCacheEnabled: false
+            isCacheEnabled: false,
+            logging: {
+                type: "disabled",
+                filePath: "log.txt"
+            }
         };
         if (instance) {
           throw new Error("You can only create one instance!");

@@ -88,3 +88,33 @@ describe("aliases", () => {
     ].join("\n").replaceAll("\\","\\\\"));
   });
 });
+
+describe("logs", () => {
+  test("log to screen - transformation of named export", () => {
+    const log = {
+      type: "screen",
+    }
+    const pluginOptions = { logging: log };
+    expect(
+      pluginTransform(
+        'import { RedText as NamedExported } from "./components/Texts";',
+        __filename,
+        pluginOptions
+      )
+    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+  });
+
+  test("log to file - transformation of named export", () => {
+    const log = {
+      type: "file",
+    }
+    const pluginOptions = { logging: log };
+    expect(
+      pluginTransform(
+        'import { RedText as NamedExported } from "./components/Texts";',
+        __filename,
+        pluginOptions
+      )
+    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+  });
+});
