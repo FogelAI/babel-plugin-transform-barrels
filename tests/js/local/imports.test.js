@@ -72,6 +72,22 @@ describe("aliases", () => {
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
+  test("transformation of vite alias", () => {
+    const alias = {
+      components: ospath.resolve(__dirname, 'components'),
+    }
+    const pluginOptions = { viteAlias: alias };
+    expect(
+      pluginTransform(
+        'import { Text } from "components/Texts";',
+        __filename,
+        pluginOptions
+      )
+    ).toBe([
+      `import { Text } from \"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js";`,
+    ].join("\n").replaceAll("\\","\\\\"));
+  });
+
   test("transformation of jest alias", () => {
     const alias = Object.entries({
       "^abc/(.*)$": "./components/$1"

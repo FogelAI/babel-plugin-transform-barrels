@@ -13,6 +13,7 @@ const importDeclarationVisitor = (path, state) => {
   if (AST.getSpecifierType(importsSpecifiers[0]) === "namespace") return;
   const parsedJSFile = state.filename;
   const importsPath = path.node.source.value;
+  if (importsPath.startsWith("/") || importsPath.startsWith("\\")) return;
   if (builtinModules.includes(importsPath)) return;
   logger.log(`Source import line: ${generate(path.node, { comments: false, concise: true }).code}`);
   resolver.from = parsedJSFile;
@@ -47,6 +48,8 @@ module.exports = function (babel) {
       let executor;
       if (pluginOptions.executorName === "webpack") {
         executor = ExecutorFactory.createExecutor("webpack", options.webpackAlias, options.webpackExtensions);
+      } else if (pluginOptions.executorName === "vite") {
+        executor = ExecutorFactory.createExecutor("vite", options.viteAlias, options.viteExtensions);
       } else if (pluginOptions.executorName === "jest") {
         executor = ExecutorFactory.createExecutor("jest", options.jestAlias, options.jestExtensions);
       } else {

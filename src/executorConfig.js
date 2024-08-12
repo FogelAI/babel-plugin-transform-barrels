@@ -97,6 +97,16 @@ class WebpackStrategy {
     }
 }
 
+class ViteStrategy {
+  prepareExtensions(extensions) {
+      return extensions;
+  }
+
+  prepareAlias(alias) {
+      return alias;
+  }
+}
+
 class JestStrategy {
     prepareExtensions(extensions) {
         return extensions.map(ext => `.${ext}`);
@@ -114,6 +124,10 @@ class ExecutorFactory {
           const webpack = new ExecutorConfig(alias, extensions, new WebpackStrategy());
           webpack.load();
           return webpack;
+        case 'vite':
+          const vite = new ExecutorConfig(alias, extensions, new ViteStrategy());
+          vite.load();
+          return vite;
         case 'jest':
           const jest = new ExecutorConfig(alias, extensions, new JestStrategy());
           jest.load();
