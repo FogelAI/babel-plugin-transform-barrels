@@ -126,6 +126,10 @@ class PathFunctions {
     static replaceFileExtension(filePath, newExtension) {
       return filePath.replace(/(\.[^/.]+)?$/, newExtension);
     }
+
+    static isSpecialCharInBundlerPathImport(importPath) {
+      return importPath.search(/[?:]/) !== -1;
+    }
 }
 
 module.exports = PathFunctions;

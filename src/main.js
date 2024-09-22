@@ -6,6 +6,7 @@ const resolver = require("./resolver");
 const BarrelFileManagerFacade = require("./barrel");
 const pluginOptions = require("./pluginOptions");
 const logger = require("./logger");
+const PathFunctions = require("./path");
 
 const importDeclarationVisitor = (path, state) => {
   const importsSpecifiers = path.node.specifiers;
@@ -14,6 +15,8 @@ const importDeclarationVisitor = (path, state) => {
   const parsedJSFile = state.filename;
   const importsPath = path.node.source.value;
   if (pluginOptions.options.executorName === "vite" && importsPath.startsWith("/")) return;
+  if (pluginOptions.options.executorName === "webpack" && importsPath.includes("!")) return;
+  if (PathFunctions.isSpecialCharInBundlerPathImport(importsPath)) return;
   if (builtinModules.includes(importsPath)) return;
   logger.log(`Source import line: ${generate(path.node, { comments: false, concise: true }).code}`);
   resolver.from = parsedJSFile;
