@@ -149,9 +149,7 @@ class BarrelFile {
             const { exportedName } = specifierObj;
             const deepestDirectSpecifier = this.getDeepestDirectSpecifierObject(specifierObj);
             deepestDirectSpecifier.esmPath = PathFunctions.normalizeModulePath(deepestDirectSpecifier.esmPath);
-            if (!this.defaultPatternExport.isMatchDefaultPattern(deepestDirectSpecifier)) {
-              this.exportMapping[exportedName] = deepestDirectSpecifier;
-            }
+            this.exportMapping[exportedName] = deepestDirectSpecifier;
           }
         }
     }
@@ -230,7 +228,8 @@ class BarrelFile {
     getDeepestDirectSpecifierObject(specifierObj) {
         const { esmPath, localName } = specifierObj;
         if (BarrelFile.isBarrelFilename(esmPath)) {
-          const barrelFile = BarrelFileManagerFacade.getBarrelFile(esmPath);
+          const absEsmFile = resolver.resolve(esmPath ,this.path).absEsmFile;
+          const barrelFile = BarrelFileManagerFacade.getBarrelFile(absEsmFile);
           if (barrelFile.isBarrelFileContent) {
             const deepestSpecifier = barrelFile.getDirectSpecifierObject(localName);
             return this.getDeepestDirectSpecifierObject(deepestSpecifier);
