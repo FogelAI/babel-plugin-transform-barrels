@@ -97,16 +97,17 @@ class BarrelFile {
         if (node.specifiers.length > 0) {
           node.specifiers.forEach((specifier) => {
             let specifierObj = SpecifierFactory.createSpecifier("export");
+            specifierObj.exportedName = specifier.exported.name;
+            specifierObj.localName = specifier?.local?.name;
+            specifierObj.type = AST.getSpecifierType(specifier);
+            specifierObj.esmPath = this.path;
             if (node.source) {
               // if node.source exist -> export { abc } from './abc';
-              specifierObj.exportedName = specifier.exported.name;
-              specifierObj.localName = specifier?.local?.name;
-              specifierObj.type = AST.getSpecifierType(specifier);
               const exportPath = node.source.value;
               specifierObj.esmPath = resolver.resolve(exportPath, this.path).absEsmFile;
             } else {
               // if node.source doesnt exist -> export { abc };
-              const localName = specifier?.local?.name;
+              const { localName } = specifierObj;
               if (localName in this.importMapping) {
                 specifierObj = this.importMapping[localName].toExportSpecifier();
                 specifierObj.exportedName = specifier.exported.name;
@@ -227,7 +228,7 @@ class BarrelFile {
 
     getDeepestDirectSpecifierObject(specifierObj) {
         const { esmPath, localName } = specifierObj;
-        if (BarrelFile.isBarrelFilename(esmPath)) {
+        if (BarrelFile.isBarrelFilename(esmPath) && esmPath !== this.path) {
           const absEsmFile = resolver.resolve(esmPath ,this.path).absEsmFile;
           const barrelFile = BarrelFileManagerFacade.getBarrelFile(absEsmFile);
           if (barrelFile.isBarrelFileContent) {
