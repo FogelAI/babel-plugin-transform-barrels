@@ -103,7 +103,7 @@ class WebpackStrategy {
         const newAliasObj = {};
         const aliases = Object.keys(aliasObj);
         for (const alias of aliases) {
-          newAliasObj[`^${alias}`] = aliasObj[alias];
+          newAliasObj[`^${alias}((?:[\\/]|$))`] = `${aliasObj[alias]}$1`;
         }
         return newAliasObj;  
     }
