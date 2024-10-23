@@ -53,6 +53,18 @@ describe("local package transformation", () => {
     `import { FirstReexported } from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
+
+  test("transformation of named import that in the barrel file is reexported all the other module. In the other module there is export of object pattern", () => {
+    expect(
+      pluginTransform(
+        'import { firstKeyVar, secondKeyVar } from "./components/ReexportedAll";',
+        __filename
+      )
+    ).toBe([
+    `import { firstKeyVar } from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
+    `import { secondKeyVar } from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
+    ].join("\n").replaceAll("\\","\\\\"));
+  });
 });
 
 describe("aliases", () => {

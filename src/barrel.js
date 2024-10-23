@@ -122,19 +122,34 @@ class BarrelFile {
           });
         };
         if (node.declaration) {
-          const specifierObj = SpecifierFactory.createSpecifier("export");
-          specifierObj.type = "named";
-          specifierObj.esmPath = this.path;
           const declarations = node.declaration.declarations || [node.declaration];
           // if declaration exists -> export function abc(){};
           // if declaration.declarations exists -> export const abc = 5, def = 10;
           declarations.forEach((declaration) => {
-            specifierObj.localName = declaration.id.name;
-            specifierObj.exportedName = declaration.id.name;
-            const { exportedName } = specifierObj;
-            specifierObj.esmPath = PathFunctions.normalizeModulePath(specifierObj.esmPath);
-            if (!this.defaultPatternExport.isMatchDefaultPattern(specifierObj)) {
-              this.exportMapping[exportedName] = specifierObj;
+            if (t.isObjectPattern(declaration.id)) {
+              for (const property of declaration.id.properties) {
+                const specifierObj = SpecifierFactory.createSpecifier("export");
+                specifierObj.type = "named";
+                specifierObj.esmPath = this.path;      
+                specifierObj.localName = property.value.name;
+                specifierObj.exportedName = property.value.name;
+                const { exportedName } = specifierObj;
+                specifierObj.esmPath = PathFunctions.normalizeModulePath(specifierObj.esmPath);
+                if (!this.defaultPatternExport.isMatchDefaultPattern(specifierObj)) {
+                  this.exportMapping[exportedName] = specifierObj;
+                }    
+              }
+            } else {
+              const specifierObj = SpecifierFactory.createSpecifier("export");
+              specifierObj.type = "named";
+              specifierObj.esmPath = this.path;    
+              specifierObj.localName = declaration.id.name;
+              specifierObj.exportedName = declaration.id.name;
+              const { exportedName } = specifierObj;
+              specifierObj.esmPath = PathFunctions.normalizeModulePath(specifierObj.esmPath);
+              if (!this.defaultPatternExport.isMatchDefaultPattern(specifierObj)) {
+                this.exportMapping[exportedName] = specifierObj;
+              }  
             }
           });
         }
