@@ -49,6 +49,7 @@ module.exports = function (babel) {
       logger.log(`Processed Javascript file: ${state.opts.filename}`);
       const executor = ExecutorFactory.createExecutor(options.executorName, options.alias, options.extensions);
       resolver.appendAlias(executor.getAlias());
+      resolver.setModulesDirs(options.modulesDirs);
       const extensions = executor.getExtensions();
       extensions.length !==0 && resolver.setExtensions(extensions)
     },

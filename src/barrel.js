@@ -366,7 +366,7 @@ class Specifier {
   }
 
   get absEsmPath() {
-    return PathFunctions.getAbsolutePath(this.esmPath, resolver.from);
+    return PathFunctions.getAbsolutePath(this.esmPath, resolver.from, resolver.modulesDirs);
   }
 
   get cjsPath() {

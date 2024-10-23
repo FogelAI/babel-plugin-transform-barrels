@@ -69,7 +69,7 @@ class PathFunctions {
       return path.substring(0, ospath.normalize(path).lastIndexOf(ospath.sep));
     }    
   
-    static getAbsolutePath(path, from=process.cwd()) {
+    static getAbsolutePath(path, from=process.cwd(), modulesDirs=["node_modules"]) {
       if (ospath.isAbsolute(path)) return path;
       let currentDir = from;
       if (!PathFunctions.isNodeModule(path)) return ospath.join(currentDir, path);
@@ -81,19 +81,26 @@ class PathFunctions {
               return ospath.join(nodeModulesFolder[mainPackage], path)
           }
       }
+      let nodeModulesPath;
       while (currentDir) {
           if (currentDir.endsWith("node_modules")) {
               currentDir = PathFunctions.removeLastSegment(currentDir);
               continue;
           }
-          const nodeModulesPath = ospath.join(currentDir, "node_modules");
-          const packagePath = ospath.join(nodeModulesPath, mainPackage);
-          if (PathFunctions.pathExists(packagePath)) {
-              nodeModulesFolder[mainPackage] = nodeModulesPath;
-              return ospath.join(nodeModulesPath, path);
+          for (const modulesDir of modulesDirs) {
+            if (ospath.isAbsolute(modulesDir)) {
+              nodeModulesPath = modulesDir;
+            } else {
+              nodeModulesPath = ospath.join(currentDir, modulesDir);
+            }
+            const packagePath = ospath.join(nodeModulesPath, mainPackage);
+            if (PathFunctions.pathExists(packagePath)) {
+                nodeModulesFolder[mainPackage] = nodeModulesPath;
+                return ospath.join(nodeModulesPath, path);
+            }
           }
-          currentDir = PathFunctions.removeLastSegment(currentDir);
-      }
+          currentDir = PathFunctions.removeLastSegment(currentDir);  
+        }
       nodeModulesFolder[mainPackage] = null;
       return null;    
     }

@@ -7,6 +7,8 @@ class Resolver {
     constructor() {
         this.aliasObj = {};
         this.from = "";
+        const defaultModulesDirs = ["node_modules"];
+        this.modulesDirs = defaultModulesDirs;
         const defaultExtensions = ["", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"];
         this.extensions = defaultExtensions;
         if (instance) {
@@ -18,6 +20,10 @@ class Resolver {
     setExtensions(extensions) {
       this.extensions = extensions;
       this.extensions.unshift("");
+    }
+
+    setModulesDirs(modulesDirs) {
+      this.modulesDirs = modulesDirs;
     }
 
     isExtensionFile(path, ext) {
@@ -36,7 +42,7 @@ class Resolver {
     resolve(path, from) {
         const originalPath = PathFunctions.isRegularPath(path) ? path : this.convertAliasToOriginal(path);
         const fromDir = ospath.dirname(from);
-        const absolutePath = PathFunctions.getAbsolutePath(originalPath, fromDir);
+        const absolutePath = PathFunctions.getAbsolutePath(originalPath, fromDir, this.modulesDirs);
         if (!absolutePath) return;
         const filePath = this.getFilePathWithExtension(absolutePath);
         if (filePath) {

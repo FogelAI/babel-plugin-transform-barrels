@@ -72,6 +72,22 @@ describe("aliases", () => {
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
+  test("transformation of webpack alias - exact match", () => {
+    const alias = {
+      texts$: ospath.resolve(__dirname, 'components/Texts'),
+    }
+    const pluginOptions = { executorName: "webpack", alias: alias };
+    expect(
+      pluginTransform(
+        'import { Text } from "texts";',
+        __filename,
+        pluginOptions
+      )
+    ).toBe([
+      `import { Text } from \"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js";`,
+    ].join("\n").replaceAll("\\","\\\\"));
+  });
+
   test("transformation of vite alias", () => {
     const alias = {
       components: ospath.resolve(__dirname, 'components'),
@@ -128,6 +144,32 @@ describe("logs", () => {
     expect(
       pluginTransform(
         'import { RedText as NamedExported } from "./components/Texts";',
+        __filename,
+        pluginOptions
+      )
+    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+  });
+});
+
+describe("modules directories", () => {
+  test("resolve modules directories - relative path", () => {
+    const modulesDirs = ["node_modules", "components"];
+    const pluginOptions = { executorName: "webpack", modulesDirs: modulesDirs };
+    expect(
+      pluginTransform(
+        'import { RedText as NamedExported } from "Texts";',
+        __filename,
+        pluginOptions
+      )
+    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+  });
+
+  test("resolve modules directories - absolute path", () => {
+    const modulesDirs = [ospath.resolve(__dirname, 'components'), 'node_modules'];
+    const pluginOptions = { executorName: "webpack", modulesDirs: modulesDirs };
+    expect(
+      pluginTransform(
+        'import { RedText as NamedExported } from "Texts";',
         __filename,
         pluginOptions
       )

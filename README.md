@@ -59,13 +59,14 @@ import { List } from './components/List/List'
 
 ## Options
 
-|     **Name**     |  **Type** |                    **Default**                   |                                                                                            **Description**                                                                                           |
-|:----------------:|:---------:|:------------------------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-|  `executorName`  |  `string` |                     `"other"`                    |                                                     It should be assigned with one of the supported executor values: `webpack`, `vite` or `jest`.                                                    |
-|      `alias`     |  `object` |                       `{}`                       |                                                             It should be assigned with the `alias` value option from the executor config.                                                            |
-|   `extensions`   |  `array`  | `[".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"]` |                                                          It should be assigned with the `extensions` value option from the executor config.                                                          |
-| `isCacheEnabled` | `boolean` |                      `false`                     |                                                                                 If `true`, enables file-based cache.                                                                                 |
-|     `logging`    |  `object` |    `{ type: "disabled", filePath: "log.txt" }`   | Specifies logging options.<br>`type` can be `disabled` for no logging, `file` for logs to a file, or `screen` for logs to the console.<br>If type is `file`, `filePath` specifies the log file path. |
+|     **Name**     |  **Type** |                    **Default**                   |                                                                                         **Description**                                                                                        |
+|:----------------:|:---------:|:------------------------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+|  `executorName`  |  `string` |                     `"other"`                    |                                                  It should be assigned with one of the supported executor values: `webpack`, `vite` or `jest`.                                                 |
+|      `alias`     |  `object` |                       `{}`                       |                                                          It should be assigned with the `alias` value option from the executor config.                                                         |
+|   `extensions`   |  `array`  | `[".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"]` |                                                       It should be assigned with the `extensions` value option from the executor config.                                                       |
+|   `modulesDirs`  |  `array`  |                `["node_modules"]`                |                                        It should be assigned with the `modules` value option of Webpack or the `moduleDirectories` value option of Jest.                                       |
+| `isCacheEnabled` | `boolean` |                      `false`                     |                                                                              If `true`, enables file-based cache.                                                                              |
+|     `logging`    |  `object` |    `{ type: "disabled", filePath: "log.txt" }`   | Specifies logging options. `type` can be `disabled` for no logging, `file` for logs to a file, or `screen` for logs to the console. If type is `file`, `filePath` specifies the log file path. |
 
 ## The Problem
 
