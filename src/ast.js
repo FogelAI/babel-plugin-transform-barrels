@@ -1,6 +1,9 @@
 const fs = require("fs");
 const parser = require("@babel/parser");
 const t = require("@babel/types");
+const { builtinModules } = require('module');
+const pluginOptions = require("./pluginOptions");
+const PathFunctions = require("./path");
 
 class AST {
     static filenameToAST = (filename) => {
@@ -82,6 +85,18 @@ class AST {
       }
       return t.objectExpression(objectProperties)
     }
+
+    static isSpecialImportCases(node) {
+      const importsPath = node.source.value;
+      const importsSpecifiers = node.specifiers;
+      if (!AST.isAnySpecifierExist(importsSpecifiers)) return true;
+      if (AST.getSpecifierType(importsSpecifiers[0]) === "namespace") return true;
+      if (pluginOptions.options.executorName === "vite" && importsPath.startsWith("/")) return true;
+      if (pluginOptions.options.executorName === "webpack" && importsPath.includes("!")) return true;
+      if (PathFunctions.isSpecialCharInBundlerPathImport(importsPath)) return true;
+      if (builtinModules.includes(importsPath)) return true;
+      return false;
+    }    
 }
 
 module.exports = AST;

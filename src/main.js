@@ -1,4 +1,3 @@
-const { builtinModules } = require('module');
 const generate = require('@babel/generator').default;
 const AST = require("./ast");
 const { ExecutorFactory, JestMock } = require("./executorConfig");
@@ -6,20 +5,14 @@ const resolver = require("./resolver");
 const BarrelFileManagerFacade = require("./barrel");
 const pluginOptions = require("./pluginOptions");
 const logger = require("./logger");
-const PathFunctions = require("./path");
 
 const jestMockFunction = new JestMock();
 
 const importDeclarationVisitor = (path, state) => {
   const importsSpecifiers = path.node.specifiers;
-  if (!AST.isAnySpecifierExist(importsSpecifiers)) return;
-  if (AST.getSpecifierType(importsSpecifiers[0]) === "namespace") return;
   const parsedJSFile = state.filename;
   const importsPath = path.node.source.value;
-  if (pluginOptions.options.executorName === "vite" && importsPath.startsWith("/")) return;
-  if (pluginOptions.options.executorName === "webpack" && importsPath.includes("!")) return;
-  if (PathFunctions.isSpecialCharInBundlerPathImport(importsPath)) return;
-  if (builtinModules.includes(importsPath)) return;
+  if (AST.isSpecialImportCases(path.node)) return;
   logger.log(`Source import line: ${generate(path.node, { comments: false, concise: true }).code}`);
   resolver.from = parsedJSFile;
   const resolvedPathObject = resolver.resolve(importsPath ,parsedJSFile);

@@ -181,6 +181,7 @@ class BarrelFile {
     }
     
     handleImportDeclaration(node) {
+        if (AST.isSpecialImportCases(node)) return false;
         node.specifiers.forEach((specifier) => {
             // import {abc, def} from './abc';
             const specifierObj = SpecifierFactory.createSpecifier("import");

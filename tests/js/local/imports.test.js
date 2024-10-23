@@ -220,3 +220,14 @@ describe("jest mock", () => {
     ].join("\n").replaceAll("\\","\\\\"));
   });
 });
+
+describe("special module usecases transformation", () => {
+  test("transformation of special chars in the path import", () => {
+    expect(
+      pluginTransform(
+        'import async_hooks from "node:async_hooks";',
+        __filename
+      )
+    ).toBe(`import async_hooks from \"node:async_hooks";`.replaceAll("\\","\\\\"));
+  });
+});
