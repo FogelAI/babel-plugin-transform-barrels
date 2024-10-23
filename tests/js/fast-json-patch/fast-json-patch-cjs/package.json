@@ -1,0 +1,17 @@
+{
+  "name": "fast-json-patch-cjs",
+  "version": "1.0.0",
+  "main": "fast-json-patch-cjs.test.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.24.6",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0"
+  },
+  "scripts": {
+    "test": "jest --config=../../jest.config.js"
+  },
+  "dependencies": {
+    "fast-json-patch": "^3.1.1"
+  }
+}

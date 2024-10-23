@@ -389,9 +389,18 @@ class Specifier {
     return packageObj.convertESMToCJSPath(this.esmPath);
   }
 
+  get absCjsPath() {
+    return PathFunctions.getAbsolutePath(this.cjsPath, resolver.from, resolver.modulesDirs);
+  }
+
   get path() {
     const packageObj = packageManager.getNearestPackageJsonContent();
-    return (!PathFunctions.isNodeModule(this.esmPath) || packageObj?.type === "module") ? this.esmPath : this.cjsPath;
+    if (!PathFunctions.isNodeModule(this.esmPath) || packageObj?.type === "module") {
+      return this.esmPath;
+    } else {
+      if (!PathFunctions.fileExists(this.absCjsPath)) return null;
+      return this.cjsPath;
+    }
   }
 }
 

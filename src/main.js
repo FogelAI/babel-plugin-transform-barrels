@@ -23,16 +23,16 @@ const importDeclarationVisitor = (path, state) => {
   const resolvedPathObject = resolver.resolve(importsPath ,parsedJSFile);
   const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);
   if (!barrelFile.isBarrelFileContent) return;
-  const directSpecifierASTArray = importsSpecifiers.map((specifier) =>
-    {
-      const importedName = specifier?.imported?.name || "default";
-      const importSpecifier = barrelFile.getDirectSpecifierObject(importedName).toImportSpecifier();
-      importSpecifier.localName = specifier.local.name;
-      const transformedASTImport = AST.createASTImportDeclaration(importSpecifier);
-      logger.log(`Transformed import line: ${generate(transformedASTImport).code}`);
-      return transformedASTImport;
-    }
-  );
+  const directSpecifierASTArray = []
+  for (const specifier of importsSpecifiers) {
+    const importedName = specifier?.imported?.name || "default";
+    const importSpecifier = barrelFile.getDirectSpecifierObject(importedName).toImportSpecifier();
+    if (!importSpecifier.path) return;
+    importSpecifier.localName = specifier.local.name;
+    const transformedASTImport = AST.createASTImportDeclaration(importSpecifier);
+    logger.log(`Transformed import line: ${generate(transformedASTImport).code}`);
+    directSpecifierASTArray.push(transformedASTImport);
+  }
   path.replaceWithMultiple(directSpecifierASTArray);
 };
 
