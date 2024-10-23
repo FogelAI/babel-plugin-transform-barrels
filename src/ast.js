@@ -53,6 +53,35 @@ class AST {
       }
       return t.importDeclaration([astImportSpecifier], t.stringLiteral(path));
     }  
-  }
+
+    static createASTJestMockCallFunction = (specifiersByModule) => {
+      const astExpressionStatements = [];
+      const modules = Object.keys(specifiersByModule);
+      for (const modulePath of modules) {
+        const callee = t.memberExpression(t.identifier("jest"), t.identifier("mock"));
+        const mockModuleNameParameter = t.stringLiteral(modulePath);
+        const functionArguments = [mockModuleNameParameter];
+        if (specifiersByModule[modulePath].length !== 0) {
+          const astObject = AST.createASTObject(specifiersByModule[modulePath]);
+          const mockCallbackParameter = t.arrowFunctionExpression([], astObject);  
+          functionArguments.push(mockCallbackParameter);
+        }
+        const callExpression = t.callExpression(callee, functionArguments)
+        astExpressionStatements.push(t.expressionStatement(callExpression));
+      }
+      return astExpressionStatements;
+    }  
+
+    static createASTObject(obj) {
+      const keys = Object.keys(obj);
+      const objectProperties = [];
+      for (const key of keys) {
+        const name = obj[key].name;
+        const value = obj[key].astValue;
+        objectProperties.push(t.objectProperty(t.identifier(name), value));
+      }
+      return t.objectExpression(objectProperties)
+    }
+}
 
 module.exports = AST;

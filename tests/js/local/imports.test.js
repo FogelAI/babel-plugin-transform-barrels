@@ -188,3 +188,35 @@ describe("modules directories", () => {
     ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
   });
 });
+
+describe("jest mock", () => {
+  test("transformation of module path", () => {
+    const pluginOptions = { executorName: "jest", logging: {type: "file"} };
+    expect(
+      pluginTransform([
+        'import { RedText, Text } from "./components/Texts";', 
+        `jest.mock('./components/Texts', () => ({`,
+        `  RedText: jest.fn(),`,
+        `  Text: jest.fn(),`,
+        `}));`,
+        `jest.mock('./components/Texts');`,
+        `console.log("test");`
+        ].join("\n"),
+        __filename,
+        pluginOptions
+      )
+    ).toBe([
+      `import { RedText } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`,
+      `import { Text } from \"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js";`,
+      `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js", () => ({`,
+      `  RedText: jest.fn()`,
+      `}));`,
+      `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js", () => ({`,
+      `  Text: jest.fn()`,
+      `}));`,
+      `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js");`,
+      `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js");`,
+      `console.log("test");`
+    ].join("\n").replaceAll("\\","\\\\"));
+  });
+});

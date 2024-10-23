@@ -1,12 +1,14 @@
 const { builtinModules } = require('module');
 const generate = require('@babel/generator').default;
 const AST = require("./ast");
-const ExecutorFactory = require("./executorConfig");
+const { ExecutorFactory, JestMock } = require("./executorConfig");
 const resolver = require("./resolver");
 const BarrelFileManagerFacade = require("./barrel");
 const pluginOptions = require("./pluginOptions");
 const logger = require("./logger");
 const PathFunctions = require("./path");
+
+const jestMockFunction = new JestMock();
 
 const importDeclarationVisitor = (path, state) => {
   const importsSpecifiers = path.node.specifiers;
@@ -28,6 +30,9 @@ const importDeclarationVisitor = (path, state) => {
     const importedName = specifier?.imported?.name || "default";
     const importSpecifier = barrelFile.getDirectSpecifierObject(importedName).toImportSpecifier();
     if (!importSpecifier.path) return;
+    if (pluginOptions.options.executorName === "jest") {
+      jestMockFunction.barrelImports.add(importsPath, importSpecifier.path);
+    }
     importSpecifier.localName = specifier.local.name;
     const transformedASTImport = AST.createASTImportDeclaration(importSpecifier);
     logger.log(`Transformed import line: ${generate(transformedASTImport).code}`);
@@ -35,6 +40,27 @@ const importDeclarationVisitor = (path, state) => {
   }
   path.replaceWithMultiple(directSpecifierASTArray);
 };
+
+const expressionStatementVisitor = (path, state) => {
+  if (!(pluginOptions.options.executorName === "jest")) return;
+  if (!JestMock.isJestMockFunctionCall(path.node)) return;
+  jestMockFunction.setExpression(path.node.expression);
+  let directImports;
+  const { modulePath } = jestMockFunction;
+  const parsedJSFile = state.filename;
+  const moduleAbsPath = resolver.resolve(modulePath ,parsedJSFile).absEsmFile;
+  const barrelFile = BarrelFileManagerFacade.getBarrelFile(moduleAbsPath);
+  if (!barrelFile.isBarrelFileContent) return;
+  if (AST.isAnySpecifierExist(jestMockFunction.specifiers)) {
+    directImports = jestMockFunction.getDirectImports(barrelFile).get(modulePath);
+  } else {
+    directImports = jestMockFunction.barrelImports.get(modulePath);  
+  }
+  const transformedASTImport = AST.createASTJestMockCallFunction(directImports);
+  logger.log(`Source mock line: ${generate(path.node, { comments: false, concise: true }).code}`);
+  transformedASTImport.forEach(line=> logger.log(`Transformed mock line: ${generate(line).code}`));
+  path.replaceWithMultiple(transformedASTImport)
+}
 
 module.exports = function (babel) {
   const PLUGIN_KEY = 'transform-barrels';
@@ -58,6 +84,7 @@ module.exports = function (babel) {
     },
     visitor: {
       ImportDeclaration: importDeclarationVisitor,
+      ExpressionStatement: expressionStatementVisitor,
     },
   };
 };
