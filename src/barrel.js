@@ -203,6 +203,7 @@ class BarrelFile {
             // export { abc };
             // export function abc(){};
             // export const abc = 5, def = 10;
+            if (node.exportKind === "type") return true;
             if (node.declaration && !forceFullScan) {
               this.resetProperties();
               return false;
