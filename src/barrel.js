@@ -109,8 +109,14 @@ class BarrelFile {
               // if node.source doesnt exist -> export { abc };
               const { localName } = specifierObj;
               if (localName in this.importMapping) {
+                // import { abc } from './module';
+                // export { abc };
                 specifierObj = this.importMapping[localName].toExportSpecifier();
                 specifierObj.exportedName = specifier.exported.name;
+              } else {
+                // const name = "name";
+                // export { name as differentName };
+                specifierObj.localName = specifier.exported.name; 
               }
             }
             const { exportedName } = specifierObj;
@@ -160,12 +166,24 @@ class BarrelFile {
         if (node.declaration.name) {
           const localName = node.declaration.name;
           if (localName in this.importMapping) {
+            // import { abc } from './module';
+            // export default abc;
             const specifierObj = this.importMapping[localName].toExportSpecifier();
             specifierObj.exportedName = "default";
             const { exportedName } = specifierObj;
             const deepestDirectSpecifier = this.getDeepestDirectSpecifierObject(specifierObj);
             deepestDirectSpecifier.esmPath = PathFunctions.normalizeModulePath(deepestDirectSpecifier.esmPath);
             this.exportMapping[exportedName] = deepestDirectSpecifier;
+          } else {
+            // const defaultName = "defaultName";
+            // export default defaultName;
+            let specifierObj = SpecifierFactory.createSpecifier("export");
+            specifierObj.localName = node.declaration.name;
+            specifierObj.exportedName = "default";
+            specifierObj.type = "default";
+            specifierObj.esmPath = PathFunctions.normalizeModulePath(this.path);
+            const { exportedName } = specifierObj;
+            this.exportMapping[exportedName] = specifierObj;
           }
         }
     }
@@ -185,7 +203,7 @@ class BarrelFile {
         node.specifiers.forEach((specifier) => {
             // import {abc, def} from './abc';
             const specifierObj = SpecifierFactory.createSpecifier("import");
-            specifierObj.importedName = specifier?.imported?.name;
+            specifierObj.importedName = specifier?.imported?.name || "default";
             specifierObj.localName = specifier.local.name;
             specifierObj.type = AST.getSpecifierType(specifier);
             const importPath = node.source.value;
@@ -396,7 +414,7 @@ class Specifier {
   }
 
   get path() {
-    const packageObj = packageManager.getNearestPackageJsonContent();
+    const packageObj = packageManager.getNearestPackageJsonContent(resolver.from);
     if (!PathFunctions.isNodeModule(this.esmPath) || packageObj?.type === "module") {
       return this.esmPath;
     } else {

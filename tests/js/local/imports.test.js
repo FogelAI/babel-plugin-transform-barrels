@@ -65,6 +65,28 @@ describe("local package transformation", () => {
     `import { secondKeyVar } from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
+
+  test("transformation of named import that in the barrel file is reexported all the other module. In the other module there is a variable called 'name' that is exported with the name 'differentName'", () => {
+    expect(
+      pluginTransform(
+        'import { differentName } from "./components/ReexportedAll";',
+        __filename
+      )
+    ).toBe([
+    `import { differentName } from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
+    ].join("\n").replaceAll("\\","\\\\"));
+  });
+
+  test("transformation of default import that in the barrel file is reexported all the other module. In the other module there is a variable called 'defaultName' that is exported as a default export", () => {
+    expect(
+      pluginTransform(
+        'import defaultName from "./components/ReexportedAll";',
+        __filename
+      )
+    ).toBe([
+    `import defaultName from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
+    ].join("\n").replaceAll("\\","\\\\"));
+  });
 });
 
 describe("aliases", () => {
