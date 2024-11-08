@@ -1,0 +1,17 @@
+{
+  "name": "react-virtualized-tests-cjs",
+  "version": "1.0.0",
+  "main": "react-virtualized-cjs.test.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.24.6",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0"
+  },
+  "scripts": {
+    "test": "jest --config=../../../jest.config.js"
+  },
+  "dependencies": {
+    "react-virtualized": "^9.22.5"
+  }
+}
