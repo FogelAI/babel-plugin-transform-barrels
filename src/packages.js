@@ -1,6 +1,5 @@
 const ospath = require("path");
 const PathFunctions = require("./path");
-const resolver = require("./resolver");
 
 class Package {
     constructor(path) {
@@ -42,16 +41,44 @@ class Package {
         return this.removeNodeModulesPath(HighestParentPackageDir);
     }
 
-    get cjsEntry() {
-        if (this.data.main) {
-            const cjsFolder = ospath.dirname(this.path);
-            const fullPath = resolver.resolve(ospath.join(cjsFolder, this.data.main), this.path).esmFile;
-            return PathFunctions.normalizeModulePath(fullPath);
+    get exports() {
+        return this.data.exports;
+    }
+
+    set exports(value) {
+        this.data.exports = value;
+    }
+
+    resolveExports(importPath) {
+        for (const exportKey in this.exports) {
+            const normalizedExportKey = ospath.join(this.name, exportKey);
+            if ((typeof this.exports[exportKey] === "object") && (normalizedExportKey === importPath) && ("require" in this.exports[exportKey]) && ("import" in this.exports[exportKey])) {
+                return {
+                    absCjsFile: this.exports[exportKey]["require"],
+                    absEsmFile: this.exports[exportKey]["import"]
+                }
+            }
         }
     }
 
+    get main() {
+        return this.data.main;
+    }
+
+    set main(value) {
+        this.data.main = value;
+    }
+
+    get module() {
+        return this.data.module;
+    }
+
+    get cjsEntry() {
+        return this.type === "commonjs" && this.main && ospath.join(this.name, this.main);
+    }
+
     get esmEntry() {
-        return this.data.module && ospath.join(this.name, this.data.module);
+        return this.module && ospath.join(this.name, this.module);
     }
 
     get cjsFolder() {
@@ -83,9 +110,32 @@ class Package {
         return replacedPathExt.replace(this.esmFolder, this.cjsFolder);
     }
 
+    normalizeMainField() {
+        if (this.main) {
+            if (!ospath.extname(this.main)) {
+                const cjsFolder = ospath.dirname(this.path);
+                const fullPath = require.resolve(ospath.join(cjsFolder, this.main))
+                const modulePath = PathFunctions.normalizeModulePath(fullPath);
+                this.main = ospath.relative(this.name, modulePath);
+            }
+        }
+    }
+
+    normalizeExportsField() {
+        if (!this.exports || typeof this.exports === 'string') return;
+        const key = ".";
+        if (!(key in this.exports)) this.exports = {".": this.exports};
+    }  
+
+    normalizeFields() {
+        this.normalizeMainField();
+        this.normalizeExportsField();
+    }
+
     load() {
         const packageJsonObj = require(this.path);
         this.data = packageJsonObj;
+        this.normalizeFields();
     }
 }
 
@@ -100,8 +150,8 @@ class PackageManager {
       instance = this;
     }
 
-    getNearestPackageJsonPath() {
-        let currentDir = ospath.dirname(resolver.from);
+    getNearestPackageJsonPath(path) {
+        let currentDir = ospath.dirname(path);
         while (currentDir) {
             const packagePath = ospath.join(currentDir, "package.json");
             if (PathFunctions.fileExists(packagePath)) {
@@ -111,8 +161,8 @@ class PackageManager {
         }
     }
 
-    getNearestPackageJsonContent() {
-        const packagePath = this.getNearestPackageJsonPath();
+    getNearestPackageJsonContent(path) {
+        const packagePath = this.getNearestPackageJsonPath(path);
         if (!packagePath) return "";
         const packageObj = require(packagePath);
         return packageObj;
@@ -121,14 +171,19 @@ class PackageManager {
     getMainPackageOfModule(modulePath) {
       const moduleDir = ospath.dirname(modulePath)
       const mainPackageJSONFile = Package.getMainPackageJSON(moduleDir);
-      let packageObj = new Package(mainPackageJSONFile);
-      if (!this.packages.has(packageObj.name)) {
-        packageObj.load();
-        this.packages.set(packageObj.name, packageObj);
-      }
-      packageObj = this.packages.get(packageObj.name);
+      const packageObj = this.getPackageJSON(mainPackageJSONFile);
       return packageObj;
     };
+
+    getPackageJSON(packageJSONFile) {
+        let packageObj = new Package(packageJSONFile);
+        if (!this.packages.has(packageObj.name)) {
+          packageObj.load();
+          this.packages.set(packageObj.name, packageObj);
+        }
+        packageObj = this.packages.get(packageObj.name);
+        return packageObj;  
+    }
 }
 
 const singletonPackageManager = new PackageManager();

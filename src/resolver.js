@@ -1,20 +1,25 @@
 const ospath = require("path");
 const PathFunctions = require("./path");
+const { packageManager } = require("./packages");
 
 let instance;
+const defaultModulesDirs = ["node_modules"];
+const defaultExtensions = ["", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"];
 
 class Resolver {
     constructor() {
-        this.aliasObj = {};
-        this.from = "";
-        const defaultModulesDirs = ["node_modules"];
-        this.modulesDirs = defaultModulesDirs;
-        const defaultExtensions = ["", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"];
-        this.extensions = defaultExtensions;
+        this.resetDefaults();
         if (instance) {
           throw new Error("You can only create one instance!");
         }
         instance = this;  
+    }
+
+    resetDefaults() {
+      this.aliasObj = {};
+      this.from = "";
+      this.modulesDirs = defaultModulesDirs;
+      this.extensions = defaultExtensions;
     }
 
     setExtensions(extensions) {
@@ -52,9 +57,10 @@ class Resolver {
           } else {
             resolvedPath.absCjsFile = filePath;
           }
+          resolvedPath.originalPath = path;
           return resolvedPath;
         }
-        const entryPath = this.getFilePathFromPackageJson(absolutePath);
+        const entryPath = this.getFilePathFromPackageJson(absolutePath, originalPath);
         if (entryPath) return entryPath;
         const indexPath = this.getIndexFilePath(absolutePath);
         if (indexPath) {
@@ -64,6 +70,7 @@ class Resolver {
           } else {
             resolvedPath.absCjsFile = indexPath;
           }
+          resolvedPath.originalPath = path;
           return resolvedPath;
         };
     }    
@@ -75,19 +82,22 @@ class Resolver {
       return resolvedPath;
     }  
 
-    getFilePathFromPackageJson(path) {
+    getFilePathFromPackageJson(path, importPath) {
       const packageFilename = "package.json";
       const packagePath = ospath.join(path, packageFilename);
       if (PathFunctions.fileExists(packagePath)) {
-          const configPackage = require(packagePath);
-          const { main, type, module } = configPackage;
-          const cjsModule = type !== "module" && main;
-          const esmModule = type === "module" ? main : module;
+          const packageObj = packageManager.getPackageJSON(packagePath);
+          const { main, type, module } = packageObj;
+          const exportsObj = packageObj.resolveExports(importPath);
+          const cjsModule = exportsObj?.absCjsFile || (type !== "module" && main);
+          const esmModule = exportsObj?.absEsmFile || (type === "module" ? main : module);
           const absCjsModule = cjsModule && ospath.join(path, cjsModule);
           const absEsmModule = esmModule && ospath.join(path, esmModule);
           const resolvedPath = new ResolvedPath();
           resolvedPath.absCjsFile = absCjsModule ? this.getFilePathWithExtension(absCjsModule) : ""
           resolvedPath.absEsmFile = absEsmModule ? this.getFilePathWithExtension(absEsmModule) : ""
+          resolvedPath.packageJsonExports = !!exportsObj;
+          resolvedPath.originalPath = importPath;
           return resolvedPath;
       }
     }  
@@ -119,9 +129,11 @@ class Resolver {
 }
 
 class ResolvedPath {
-  constructor(absEsmFile, absCjsFile) {
+  constructor(originalPath, absEsmFile, absCjsFile, packageJsonExports) {
+    this.originalPath = originalPath || "";
     this.absEsmFile = absEsmFile || "";
     this.absCjsFile = absCjsFile || "";
+    this.packageJsonExports = packageJsonExports || false;
   }
 
   get esmFile() {

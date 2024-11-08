@@ -191,10 +191,17 @@ class BarrelFile {
     handleExportAllDeclaration(node) {
         // export * from './abc';
         const exportPath = node.source.value;
-        let absoluteExportedPath = resolver.resolve(exportPath, this.path).absEsmFile;
+        const resolvedPathObject = resolver.resolve(exportPath, this.path);
+        let absoluteExportedPath = resolvedPathObject.absEsmFile;
         const exportedAllFile = new BarrelFile(absoluteExportedPath);
         exportedAllFile.defaultPatternExport.isDefaultPatternCreated = true;
+        exportedAllFile.resolvedPathObject = resolvedPathObject;
         exportedAllFile.createSpecifiersMapping(true);
+        if (resolvedPathObject.packageJsonExports) {
+          for (const exportKey in exportedAllFile.exportMapping) {
+            exportedAllFile.exportMapping[exportKey]["esmPath"] = resolvedPathObject.originalPath;
+          }
+        }
         Object.assign(this.exportMapping, exportedAllFile.exportMapping);
     }
     
@@ -264,6 +271,7 @@ class BarrelFile {
     getDeepestDirectSpecifierObject(specifierObj) {
         const { esmPath, localName } = specifierObj;
         if (BarrelFile.isBarrelFilename(esmPath) && esmPath !== this.path) {
+          if (this.resolvedPathObject?.packageJsonExports) return specifierObj;
           const absEsmFile = resolver.resolve(esmPath ,this.path).absEsmFile;
           const barrelFile = BarrelFileManagerFacade.getBarrelFile(absEsmFile);
           if (barrelFile.isBarrelFileContent) {
@@ -414,6 +422,7 @@ class Specifier {
   }
 
   get path() {
+    if (PathFunctions.isNodeModule(this.esmPath) && !ospath.extname(this.esmPath)) return this.esmPath;
     const packageObj = packageManager.getNearestPackageJsonContent(resolver.from);
     if (!PathFunctions.isNodeModule(this.esmPath) || packageObj?.type === "module") {
       return this.esmPath;

@@ -11,7 +11,7 @@ describe("third-party package (style-to-object) transformation for ESM", () => {
           pluginOptions
         )
       ).toBe([
-      `import style from \"style-to-object\\index.js";`,
+      `import style from \"style-to-object";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });

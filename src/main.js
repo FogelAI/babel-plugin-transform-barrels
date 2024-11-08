@@ -16,6 +16,7 @@ const importDeclarationVisitor = (path, state) => {
   logger.log(`Source import line: ${generate(path.node, { comments: false, concise: true }).code}`);
   resolver.from = parsedJSFile;
   const resolvedPathObject = resolver.resolve(importsPath ,parsedJSFile);
+  if (resolvedPathObject.packageJsonExports) return;
   const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);
   if (!barrelFile.isBarrelFileContent) return;
   const directSpecifierASTArray = []
