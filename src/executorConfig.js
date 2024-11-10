@@ -215,6 +215,10 @@ class ImportBarrelPaths {
     }
     return this.map;
   }
+  
+  hasBarrel(importBarrelPath) {
+    return importBarrelPath in this.map;
+  }
 }
 
 module.exports = { ExecutorFactory, JestMock};

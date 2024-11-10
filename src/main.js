@@ -41,6 +41,7 @@ const expressionStatementVisitor = (path, state) => {
   jestMockFunction.setExpression(path.node.expression);
   let directImports;
   const { modulePath } = jestMockFunction;
+  if (!jestMockFunction.barrelImports.hasBarrel(modulePath)) return;
   const parsedJSFile = state.filename;
   const moduleAbsPath = resolver.resolve(modulePath ,parsedJSFile).absEsmFile;
   const barrelFile = BarrelFileManagerFacade.getBarrelFile(moduleAbsPath);
