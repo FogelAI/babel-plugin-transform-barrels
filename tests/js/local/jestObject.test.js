@@ -63,4 +63,68 @@ describe("jest mock", () => {
           `}));`,
         ].join("\n").replaceAll("\\","\\\\"));
     });
+
+    test("transformation of local module path using the spread operator in jest.requireActual", () => {
+      const pluginOptions = { executorName: "jest", logging: {type: "file"} };
+      expect(
+        pluginTransform([
+          `jest.mock('./components/Texts', () => ({`,
+          `  ...jest.requireActual('./components/Texts'),`,
+          `}));`,
+          ].join("\n"),
+          __filename,
+          pluginOptions
+        )
+      ).toBe([
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js")`,
+        `}));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js")`,
+        `}));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js")`,
+        `}));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js")`,
+        `}));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js")`,
+        `}));`,
+      ].join("\n").replaceAll("\\","\\\\"));
+    });
+
+    test("transformation of local module path using the spread operator in jest.requireActual and specifiers", () => {
+      const pluginOptions = { executorName: "jest", logging: {type: "file"} };
+      expect(
+        pluginTransform([
+          `jest.mock('./components/Texts', () => ({`,
+          `  ...jest.requireActual('./components/Texts'),`,
+          `  RedText: jest.fn(),`,
+          `  Text: jest.fn(),`,
+          `}));`,
+          ].join("\n"),
+          __filename,
+          pluginOptions
+        )
+      ).toBe([
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js")`,
+        `}));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js")`,
+        `}));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js")`,
+        `}));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js"),`,
+        `  Text: jest.fn()`,
+        `}));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js"),`,
+        `  RedText: jest.fn()`,
+        `}));`,
+      ].join("\n").replaceAll("\\","\\\\"));
+    });
 });

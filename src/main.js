@@ -1,6 +1,7 @@
 const generate = require('@babel/generator').default;
 const AST = require("./ast");
-const { ExecutorFactory, JestMock } = require("./executorConfig");
+const { ExecutorFactory } = require("./executorConfig");
+const { JestMock } = require("./jestMock");
 const resolver = require("./resolver");
 const BarrelFileManagerFacade = require("./barrel");
 const pluginOptions = require("./pluginOptions");
@@ -33,7 +34,8 @@ const importDeclarationVisitor = (path, state) => {
 const expressionStatementVisitor = (path, state) => {
   const jestMockFunction = new JestMock();
   if (!(pluginOptions.options.executorName === "jest")) return;
-  if (!JestMock.isJestMockFunctionCall(path.node)) return;
+  if (!JestMock.isSpecificObjectFunctionCall(path.node.expression, "jest", "mock")) return;
+  if (AST.isSpecialImportCases(path.node)) return;
   jestMockFunction.setExpression(path.node.expression);
   const { modulePath } = jestMockFunction;
   const parsedJSFile = state.filename;

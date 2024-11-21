@@ -61,35 +61,47 @@ class AST {
       const astExpressionStatements = [];
       const modules = Object.keys(specifiersByModule);
       for (const modulePath of modules) {
-        const callee = t.memberExpression(t.identifier("jest"), t.identifier("mock"));
         const mockModuleNameParameter = t.stringLiteral(modulePath);
-        const functionArguments = [mockModuleNameParameter];
+        const astFunctionArguments = [mockModuleNameParameter];
         if (specifiersByModule[modulePath].length !== 0) {
           const astObject = AST.createASTObject(specifiersByModule[modulePath]);
           const mockCallbackParameter = t.arrowFunctionExpression([], astObject);  
-          functionArguments.push(mockCallbackParameter);
+          astFunctionArguments.push(mockCallbackParameter);
         }
-        const callExpression = t.callExpression(callee, functionArguments)
+        const callExpression = AST.createASTCallExpression("jest", "mock", astFunctionArguments)
         astExpressionStatements.push(t.expressionStatement(callExpression));
       }
       return astExpressionStatements;
     }  
 
-    static createASTObject(obj) {
-      const keys = Object.keys(obj);
+    static createASTObject(arrOfObjects) {
       const objectProperties = [];
-      for (const key of keys) {
-        const name = obj[key].name;
-        const value = obj[key].astValue;
-        objectProperties.push(t.objectProperty(t.identifier(name), value));
+      for (const obj of arrOfObjects) {
+        const type = obj.type;
+        if (type === "property") {
+          const name = obj.property;
+          const value = obj.astValue;
+          objectProperties.push(t.objectProperty(t.identifier(name), value));  
+        } else if (type === "spreadElement") {
+          const modulePath = obj.modulePath;
+          const astFuncArgumentsList = [t.stringLiteral(modulePath)]; 
+          const astJestRequireActual = AST.createASTCallExpression("jest", "requireActual", astFuncArgumentsList);
+          objectProperties.push(t.spreadElement(astJestRequireActual))
+        }
       }
       return t.objectExpression(objectProperties)
     }
 
+    static createASTCallExpression(objectName, propertyName, funcArgumentsList) {
+      const callee = t.memberExpression(t.identifier(objectName), t.identifier(propertyName));
+      const callExpression = t.callExpression(callee, funcArgumentsList)
+      return callExpression;
+    }
+
     static isSpecialImportCases(node) {
-      const importsPath = node.source.value;
-      const importsSpecifiers = node.specifiers;
-      if (!AST.isAnySpecifierExist(importsSpecifiers)) return true;
+      const importsPath = node.source?.value || node.expression.arguments[0].value;
+      const importsSpecifiers = node.specifiers || node.expression.arguments[1]?.body?.properties || [];
+      if (t.isImportDeclaration(node) && !AST.isAnySpecifierExist(importsSpecifiers)) return true;
       if (AST.getSpecifierType(importsSpecifiers[0]) === "namespace") return true;
       if (pluginOptions.options.executorName === "vite" && importsPath.startsWith("/")) return true;
       if (pluginOptions.options.executorName === "webpack" && importsPath.includes("!")) return true;

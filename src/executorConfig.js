@@ -1,7 +1,5 @@
 const ospath = require("path");
 const fg = require("fast-glob");
-const t = require("@babel/types");
-const AST = require("./ast");
 const PathFunctions = require("./path");
 
 class Workspaces {
@@ -153,76 +151,5 @@ class ExecutorFactory {
       }
     }
   }
-  
-class JestMock {
-    static isJestMockFunctionCall(node) {
-      if (!(t.isCallExpression(node.expression) && t.isMemberExpression(node.expression.callee))) return false;
-      const objectName = node.expression.callee.object.name;
-      const propertyName = node.expression.callee.property.name;
-      return (objectName === "jest" && propertyName === "mock");
-    }
-  
-    constructor() {
-      this.modulePath = "";
-      this.specifiers = [];
-      this.barrelImports = new ImportBarrelPaths();
-    }
-  
-    load(expression) {
-      this.loadArguments(expression);
-    }
-  
-    loadArguments(expression) {
-      const argumentsVar = expression.arguments
-      this.modulePath = argumentsVar[0].value;
-      this.specifiers = argumentsVar[1]?.body?.properties || [];
-    }
-  
-    setExpression(expression) {
-      this.load(expression);
-    }
 
-    getDirectImportsPathMapping(barrelFile) {
-      const barrelModulePath = this.modulePath;
-      const directModules = new ImportBarrelPaths();
-      for (const specifier of this.specifiers) {
-        const importedName = specifier?.key?.name || "default";
-        const importSpecifier = barrelFile.getDirectSpecifierObject(importedName).toImportSpecifier();
-        const directModulePath = importSpecifier.path;
-        if (!importSpecifier.path) return;
-        directModules.add(barrelModulePath, directModulePath, { name: importedName, astValue: specifier.value });
-      }
-      if (!AST.isAnySpecifierExist(this.specifiers)) {
-        directModules.map[barrelModulePath] = barrelFile.getAllDirectPaths();
-      }
-      return directModules;
-    }
-}
-
-class ImportBarrelPaths {
-  constructor() {
-    this.map = {};
-  }
-
-  add(importBarrelPath, importDirectPath, specifier = null) {
-    this.map[importBarrelPath] ??= {}
-    this.map[importBarrelPath][importDirectPath] ??= [];
-    specifier && this.map[importBarrelPath][importDirectPath].push(specifier);
-  }
-
-  get(importBarrelPath, importDirectPath) {
-    if (importBarrelPath) {
-      if (importDirectPath) {
-        return this.map[importBarrelPath][importDirectPath];
-      }
-      return this.map[importBarrelPath];
-    }
-    return this.map;
-  }
-  
-  hasBarrel(importBarrelPath) {
-    return importBarrelPath in this.map;
-  }
-}
-
-module.exports = { ExecutorFactory, JestMock};
+module.exports = { ExecutorFactory };
