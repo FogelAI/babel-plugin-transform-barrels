@@ -10,9 +10,10 @@ module.exports = {
   process(sourceText, sourcePath, options) {
     const alias = options?.config?.moduleNameMapper;
     const extensions = normalizeExtensions(options.config.moduleFileExtensions, options?.config?.haste?.defaultPlatform);
+    const modulesDirs = options.config.moduleDirectories;
     const babelTransformer = babelJest.createTransformer({
       presets: [["@babel/preset-react"], ["@babel/preset-env"]],
-      plugins: [["transform-barrels", { executorName: "jest", alias: alias, extensions: extensions }]],
+      plugins: [["transform-barrels", { executorName: "jest", alias: alias, extensions: extensions, modulesDirs: modulesDirs }]],
       babelrc: false,
       configFile: false,
     });

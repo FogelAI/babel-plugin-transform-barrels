@@ -4,7 +4,7 @@ const PathFunctions = require("./path");
 class Package {
     constructor(path) {
         this.path = path;
-        this.name = this.getHighestPackageName();
+        this.name = this.getPackageName();
         this.data;
     }
 
@@ -35,10 +35,10 @@ class Package {
         return PackageDirName;
     }
 
-    getHighestPackageName() {
+    getPackageName() {
         if (!PathFunctions.isNodeModule(this.path)) return ".";
-        const HighestParentPackageDir = Package.getHighestParentPackageDir(this.path);
-        return this.removeNodeModulesPath(HighestParentPackageDir);
+        const packageDir = ospath.dirname(this.path);
+        return this.removeNodeModulesPath(packageDir);
     }
 
     get exports() {

@@ -13,6 +13,7 @@ class DefaultPatternExport {
     this.type = "";
     this.localName = "";
     this.exportedName = "";
+    this.exportedNamesList = [];
     this.isDefaultPatternCreated = false;
     this.numOfDefaultPatternUsed = 0;
     this.firstSpecifier = undefined;
@@ -56,6 +57,7 @@ class DefaultPatternExport {
                     specifierPattern.localName === this.localName;
     if (isMatch) {
       this.numOfDefaultPatternUsed += 1;
+      this.exportedNamesList.push(specifierObj.exportedName);
     }
     return isMatch;
   }
@@ -91,6 +93,19 @@ class BarrelFile {
       this.exportMapping = {};
       this.defaultPatternExport = new DefaultPatternExport();
       this.importMapping = {};
+    }
+
+    getAllDirectPaths() {
+      const obj = {};
+      for (const exportKey in this.exportMapping) {
+        const path = this.exportMapping[exportKey].path;
+        obj[path] = [];
+      }
+      for (const exportedName of this.defaultPatternExport.exportedNamesList) {
+        const path = this.getDirectSpecifierObject(exportedName).path;
+        obj[path] = [];
+      }
+      return obj;
     }
 
     handleExportNamedDeclaration(node) {
@@ -197,6 +212,7 @@ class BarrelFile {
         exportedAllFile.defaultPatternExport.isDefaultPatternCreated = true;
         exportedAllFile.resolvedPathObject = resolvedPathObject;
         exportedAllFile.createSpecifiersMapping(true);
+        delete exportedAllFile.exportMapping["default"];
         if (resolvedPathObject.packageJsonExports) {
           for (const exportKey in exportedAllFile.exportMapping) {
             exportedAllFile.exportMapping[exportKey]["esmPath"] = resolvedPathObject.originalPath;
@@ -272,10 +288,12 @@ class BarrelFile {
         const { esmPath, localName } = specifierObj;
         if (BarrelFile.isBarrelFilename(esmPath) && esmPath !== this.path) {
           if (this.resolvedPathObject?.packageJsonExports) return specifierObj;
-          const absEsmFile = resolver.resolve(esmPath ,this.path).absEsmFile;
-          const barrelFile = BarrelFileManagerFacade.getBarrelFile(absEsmFile);
+          const resolvedPathObject = resolver.resolve(esmPath ,this.path);
+          if (resolvedPathObject.packageJsonExports) return specifierObj;
+          const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);        
           if (barrelFile.isBarrelFileContent) {
-            const deepestSpecifier = barrelFile.getDirectSpecifierObject(localName);
+            const deepestSpecifier = Object.assign(new ExportSpecifier(), {...barrelFile.getDirectSpecifierObject(localName)});
+            deepestSpecifier.exportedName = specifierObj.exportedName;
             return this.getDeepestDirectSpecifierObject(deepestSpecifier);
           }  
         }
@@ -409,26 +427,35 @@ class Specifier {
   }
 
   get absEsmPath() {
-    return PathFunctions.getAbsolutePath(this.esmPath, resolver.from, resolver.modulesDirs);
+    const from = PathFunctions.isNodeModule(this.esmPath) ? ospath.dirname(resolver.from) : process.cwd();
+    return PathFunctions.getAbsolutePath(this.esmPath, from, resolver.modulesDirs);
   }
 
   get cjsPath() {
     const packageObj = packageManager.getMainPackageOfModule(this.absEsmPath);
-    return packageObj.convertESMToCJSPath(this.esmPath);
+    if (packageObj.name === this.esmPath) return this.esmPath;
+    const replacedPath = packageObj.convertESMToCJSPath(this.esmPath);
+    const from = PathFunctions.isNodeModule(replacedPath) ? ospath.dirname(resolver.from) : process.cwd();
+    const absReplacedPath = PathFunctions.getAbsolutePath(replacedPath, from, resolver.modulesDirs);
+    if (!absReplacedPath) return null;
+    return replacedPath;
   }
 
   get absCjsPath() {
-    return PathFunctions.getAbsolutePath(this.cjsPath, resolver.from, resolver.modulesDirs);
+    const from = PathFunctions.isNodeModule(this.esmPath) ? ospath.dirname(resolver.from) : process.cwd();
+    return PathFunctions.getAbsolutePath(this.cjsPath, from, resolver.modulesDirs);
   }
 
   get path() {
-    if (PathFunctions.isNodeModule(this.esmPath) && !ospath.extname(this.esmPath)) return this.esmPath;
-    const packageObj = packageManager.getNearestPackageJsonContent(resolver.from);
-    if (!PathFunctions.isNodeModule(this.esmPath) || packageObj?.type === "module") {
-      return this.esmPath;
+    if (!PathFunctions.isNodeModule(this.esmPath)) {
+      return this.absEsmPath;
     } else {
-      if (!PathFunctions.fileExists(this.absCjsPath)) return null;
-      return this.cjsPath;
+      const packageObj = packageManager.getNearestPackageJsonContent(resolver.from);
+      if (packageObj?.type === "module") {
+        return this.esmPath;
+      } else {
+        return this.cjsPath;
+      }
     }
   }
 }

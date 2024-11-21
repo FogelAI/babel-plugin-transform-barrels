@@ -1,6 +1,7 @@
 const ospath = require("path");
 const fg = require("fast-glob");
 const t = require("@babel/types");
+const AST = require("./ast");
 const PathFunctions = require("./path");
 
 class Workspaces {
@@ -181,7 +182,7 @@ class JestMock {
       this.load(expression);
     }
 
-    getDirectImports(barrelFile) {
+    getDirectImportsPathMapping(barrelFile) {
       const barrelModulePath = this.modulePath;
       const directModules = new ImportBarrelPaths();
       for (const specifier of this.specifiers) {
@@ -190,6 +191,9 @@ class JestMock {
         const directModulePath = importSpecifier.path;
         if (!importSpecifier.path) return;
         directModules.add(barrelModulePath, directModulePath, { name: importedName, astValue: specifier.value });
+      }
+      if (!AST.isAnySpecifierExist(this.specifiers)) {
+        directModules.map[barrelModulePath] = barrelFile.getAllDirectPaths();
       }
       return directModules;
     }

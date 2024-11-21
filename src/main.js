@@ -6,8 +6,6 @@ const BarrelFileManagerFacade = require("./barrel");
 const pluginOptions = require("./pluginOptions");
 const logger = require("./logger");
 
-const jestMockFunction = new JestMock();
-
 const importDeclarationVisitor = (path, state) => {
   const importsSpecifiers = path.node.specifiers;
   const parsedJSFile = state.filename;
@@ -24,9 +22,6 @@ const importDeclarationVisitor = (path, state) => {
     const importedName = specifier?.imported?.name || "default";
     const importSpecifier = barrelFile.getDirectSpecifierObject(importedName).toImportSpecifier();
     if (!importSpecifier.path) return;
-    if (pluginOptions.options.executorName === "jest") {
-      jestMockFunction.barrelImports.add(importsPath, importSpecifier.path);
-    }
     importSpecifier.localName = specifier.local.name;
     const transformedASTImport = AST.createASTImportDeclaration(importSpecifier);
     logger.log(`Transformed import line: ${generate(transformedASTImport).code}`);
@@ -36,22 +31,19 @@ const importDeclarationVisitor = (path, state) => {
 };
 
 const expressionStatementVisitor = (path, state) => {
+  const jestMockFunction = new JestMock();
   if (!(pluginOptions.options.executorName === "jest")) return;
   if (!JestMock.isJestMockFunctionCall(path.node)) return;
   jestMockFunction.setExpression(path.node.expression);
-  let directImports;
   const { modulePath } = jestMockFunction;
-  if (!jestMockFunction.barrelImports.hasBarrel(modulePath)) return;
   const parsedJSFile = state.filename;
-  const moduleAbsPath = resolver.resolve(modulePath ,parsedJSFile).absEsmFile;
-  const barrelFile = BarrelFileManagerFacade.getBarrelFile(moduleAbsPath);
+  resolver.from = parsedJSFile;
+  const resolvedPathObject = resolver.resolve(modulePath ,parsedJSFile);
+  if (resolvedPathObject.packageJsonExports) return;
+  const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);
   if (!barrelFile.isBarrelFileContent) return;
-  if (AST.isAnySpecifierExist(jestMockFunction.specifiers)) {
-    directImports = jestMockFunction.getDirectImports(barrelFile).get(modulePath);
-  } else {
-    directImports = jestMockFunction.barrelImports.get(modulePath);  
-  }
-  const transformedASTImport = AST.createASTJestMockCallFunction(directImports);
+  const directImportsPathMapping = jestMockFunction.getDirectImportsPathMapping(barrelFile).get(modulePath);
+  const transformedASTImport = AST.createASTJestMockCallFunction(directImportsPathMapping);
   logger.log(`Source mock line: ${generate(path.node, { comments: false, concise: true }).code}`);
   transformedASTImport.forEach(line=> logger.log(`Transformed mock line: ${generate(line).code}`));
   path.replaceWithMultiple(transformedASTImport)
