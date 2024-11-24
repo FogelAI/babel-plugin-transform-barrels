@@ -24,6 +24,28 @@ describe("jest mock", () => {
       ].join("\n").replaceAll("\\","\\\\"));
     });
 
+    test("transformation of local module path - specific specifiers with return statement", () => {
+      const pluginOptions = { executorName: "jest", logging: {type: "file"} };
+      expect(
+        pluginTransform([
+          `jest.mock('./components/Texts', () => {`,
+          `  return { RedText: jest.fn(),`,
+          `  Text: jest.fn() }`,
+          `});`,
+          ].join("\n"),
+          __filename,
+          pluginOptions
+        )
+      ).toBe([
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js", () => ({`,
+        `  RedText: jest.fn()`,
+        `}));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js", () => ({`,
+        `  Text: jest.fn()`,
+        `}));`,
+      ].join("\n").replaceAll("\\","\\\\"));
+    });
+
     test("transformation of local module path - side effect import", () => {
       const pluginOptions = { executorName: "jest", logging: {type: "file"} };
       expect(

@@ -24,7 +24,7 @@ class JestMock {
     loadArguments(expression) {
       const argumentsVar = expression.arguments
       this.modulePath = argumentsVar[0].value;
-      this.properties = argumentsVar[1]?.body?.properties || [];
+      this.properties = argumentsVar[1]?.body?.properties || argumentsVar[1]?.body?.body[0]?.argument?.properties || [];
     }
   
     setExpression(expression) {
