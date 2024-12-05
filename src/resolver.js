@@ -5,6 +5,7 @@ const { packageManager } = require("./packages");
 let instance;
 const defaultModulesDirs = ["node_modules"];
 const defaultExtensions = ["", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"];
+const nodeModulesFolder = {};
 
 class Resolver {
     constructor() {
@@ -19,6 +20,7 @@ class Resolver {
       this.aliasObj = {};
       this.from = "";
       this.modulesDirs = defaultModulesDirs;
+      this.absModuleDirs = [];
       this.extensions = defaultExtensions;
     }
 
@@ -28,52 +30,91 @@ class Resolver {
     }
 
     setModulesDirs(modulesDirs) {
-      this.modulesDirs = modulesDirs;
-    }
-
-    isExtensionFile(path, ext) {
-      const extFilePathRegex = new RegExp(`\.(${ext})$`);
-      return extFilePathRegex.test(path.toLowerCase());  
-    }
-
-    getTargetPathType(target, from) {
-      if (this.isExtensionFile(target, "cjs") || (!PathFunctions.isNodeModule(from) && PathFunctions.isNodeModule(target) && !this.isExtensionFile(target, "mjs"))) {
-        return "CJS";
-      } else {
-        return "ESM";
+      this.modulesDirs = [];
+      for (const moduleDir of modulesDirs) {
+        if (ospath.isAbsolute(moduleDir)) {
+          this.absModuleDirs.push(moduleDir);
+        } else {
+          this.modulesDirs.push(moduleDir);
+        }
       }
     }
 
     resolve(path, from) {
-        const originalPath = PathFunctions.isRegularPath(path) ? path : this.convertAliasToOriginal(path);
+        let resolvedPath;
         const fromDir = ospath.dirname(from);
-        const absolutePath = PathFunctions.getAbsolutePath(originalPath, fromDir, this.modulesDirs);
-        if (!absolutePath) return;
-        const filePath = this.getFilePathWithExtension(absolutePath);
-        if (filePath) {
-          const resolvedPath = new ResolvedPath();
-          if (this.getTargetPathType(filePath, from) === "ESM") {
-            resolvedPath.absEsmFile = filePath;
-          } else {
-            resolvedPath.absCjsFile = filePath;
-          }
-          resolvedPath.originalPath = path;
-          return resolvedPath;
-        }
-        const entryPath = this.getFilePathFromPackageJson(absolutePath, originalPath);
-        if (entryPath) return entryPath;
-        const indexPath = this.getIndexFilePath(absolutePath);
-        if (indexPath) {
-          const resolvedPath = new ResolvedPath();
-          if (this.getTargetPathType(indexPath, from) === "ESM") {
-            resolvedPath.absEsmFile = indexPath;
-          } else {
-            resolvedPath.absCjsFile = indexPath;
-          }
-          resolvedPath.originalPath = path;
-          return resolvedPath;
-        };
+        const originalPath = PathFunctions.isRegularPath(path) ? path : this.convertAliasToOriginal(path);
+        resolvedPath = this.resolveRegularPaths(originalPath, fromDir);
+        if (resolvedPath) return resolvedPath;
+        resolvedPath = this.resolveAbsoluteModuleDirs(originalPath, fromDir);
+        if (resolvedPath) return resolvedPath;
+        return this.resolveNodeModules(originalPath, fromDir);
     }    
+
+    resolveRegularPaths(path, fromDir) {
+      let fixedPath = path;
+      if (PathFunctions.isRelativePath(path)) {
+        fixedPath = ospath.join(fromDir, path);
+      }
+      if (ospath.isAbsolute(fixedPath)) {
+        return this.resolveAbsFilePath(fixedPath, fromDir);
+      }
+    }
+
+    resolveAbsoluteModuleDirs(absPath, fromDir) {
+      for (const absModuleDir of this.absModuleDirs) {
+        const path = ospath.join(absModuleDir, absPath);
+        const resolvedPath = this.resolveAbsFilePath(path, fromDir);
+        if (resolvedPath) return resolvedPath;
+      }
+    }
+
+    resolveNodeModules(path, fromDir=process.cwd()) {
+      let currentDir = fromDir;
+      let mainPackage = path.split("/")[0];
+      if (nodeModulesFolder[mainPackage] !== undefined) {
+          if (nodeModulesFolder[mainPackage] === null) {
+              return null;
+          } else {
+              const absPath = ospath.join(nodeModulesFolder[mainPackage], path);
+              return this.resolveAbsFilePath(absPath, fromDir);
+          }
+      }
+      while (currentDir) {
+          if (currentDir.endsWith("node_modules")) {
+              currentDir = PathFunctions.removeLastSegment(currentDir);
+              continue;
+          }
+          for (const modulesDir of this.modulesDirs) {
+            const nodeModulesPath = ospath.join(currentDir, modulesDir);
+            const absPath = ospath.join(nodeModulesPath, path);
+            const resolvedPath = this.resolveAbsFilePath(absPath, fromDir);
+            if (resolvedPath) {
+                nodeModulesFolder[mainPackage] = nodeModulesPath;
+                return resolvedPath;
+            }
+          }
+          currentDir = PathFunctions.removeLastSegment(currentDir);  
+        }
+      nodeModulesFolder[mainPackage] = null;
+      return null;
+    }
+
+    resolveAbsFilePath(absolutePath, fromDir) {
+      const filePath = this.getFilePathWithExtension(absolutePath);
+      if (filePath) {
+        const resolvedDualPath = ResolvedPath.createDualResolvedPath(filePath, fromDir, absolutePath);
+        return resolvedDualPath;
+      }
+      const normalizedModulePath = PathFunctions.normalizeModulePath(absolutePath)
+      const entryPath = this.getFilePathFromPackageJson(absolutePath, normalizedModulePath);
+      if (entryPath) return entryPath;
+      const indexPath = this.getIndexFilePath(absolutePath);
+      if (indexPath) {
+        const resolvedDualPath = ResolvedPath.createDualResolvedPath(indexPath, fromDir, absolutePath);
+        return resolvedDualPath;
+      };
+    }
 
     getFilePathWithExtension(path) {
       const ext = this.extensions.find((ext)=> PathFunctions.fileExists(path + ext));
@@ -93,11 +134,10 @@ class Resolver {
           const esmModule = exportsObj?.absEsmFile || (type === "module" ? main : module);
           const absCjsModule = cjsModule && ospath.join(path, cjsModule);
           const absEsmModule = esmModule && ospath.join(path, esmModule);
-          const resolvedPath = new ResolvedPath();
-          resolvedPath.absCjsFile = absCjsModule ? this.getFilePathWithExtension(absCjsModule) : ""
-          resolvedPath.absEsmFile = absEsmModule ? this.getFilePathWithExtension(absEsmModule) : ""
-          resolvedPath.packageJsonExports = !!exportsObj;
-          resolvedPath.originalPath = importPath;
+          const absCjsModuleWithExt = absCjsModule ? this.getFilePathWithExtension(absCjsModule) : "";
+          const absEsmModuleWithExt = absEsmModule ? this.getFilePathWithExtension(absEsmModule) : "";
+          const packageJsonExports = !!exportsObj;
+          const resolvedPath = new ResolvedPath(importPath, absEsmModuleWithExt, absCjsModuleWithExt, packageJsonExports);
           return resolvedPath;
       }
     }  
@@ -129,6 +169,30 @@ class Resolver {
 }
 
 class ResolvedPath {
+  static isExtensionFile(path, ext) {
+    const extFilePathRegex = new RegExp(`\.(${ext})$`);
+    return extFilePathRegex.test(path.toLowerCase());  
+  }
+
+  static getTargetPathType(target, from) {
+    if (ResolvedPath.isExtensionFile(target, "cjs") || (!PathFunctions.isNodeModule(from) && PathFunctions.isNodeModule(target) && !ResolvedPath.isExtensionFile(target, "mjs"))) {
+      return "CJS";
+    } else {
+      return "ESM";
+    }
+  }
+
+  static createDualResolvedPath(filePath, from, absolutePath) {
+    const resolvedDualPath = new ResolvedPath();
+    if (ResolvedPath.getTargetPathType(filePath, from) === "ESM") {
+      resolvedDualPath.absEsmFile = filePath;
+    } else {
+      resolvedDualPath.absCjsFile = filePath;
+    }
+    resolvedDualPath.originalPath = PathFunctions.normalizeModulePath(absolutePath);
+    return resolvedDualPath;
+  }
+
   constructor(originalPath, absEsmFile, absCjsFile, packageJsonExports) {
     this.originalPath = originalPath || "";
     this.absEsmFile = absEsmFile || "";

@@ -51,8 +51,7 @@ class PathFunctions {
     }
   
     static isRelativePath(path) {
-      const relativePathRegExp = /^\.{1,2}\//;
-      return relativePathRegExp.test(path);
+      return path.startsWith(".");
     }
     
     static isRegularPath(path) {

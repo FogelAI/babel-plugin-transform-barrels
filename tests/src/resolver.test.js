@@ -21,9 +21,11 @@ describe('Resolver class', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        jest.spyOn(process, 'cwd').mockReturnValue('c:\\project');
     });
 
     afterEach(() => {
+        jest.spyOn(process, 'cwd').mockRestore();
         mock.restore();
         resolver.resetDefaults();
     });
@@ -33,14 +35,14 @@ describe('Resolver class', () => {
             test('when resolving a relative path from a regular path, it should return a ResolvedPath instance where absEsmFile contains the file path with extension', () => {
                 // Arrange
                 mock({
-                    "c:\\path\\to.js": "",
+                    "c:\\project\\path\\to.js": "",
                 });
                 const path = "./to";
-                const from = "c:\\path\\from.js";
+                const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
                     absCjsFile: "",
-                    absEsmFile: "c:\\path\\to.js",
-                    originalPath: "./to",
+                    absEsmFile: "c:\\project\\path\\to.js",
+                    originalPath: ".\\path\\to",
                     packageJsonExports: false
                 }
         
@@ -54,14 +56,14 @@ describe('Resolver class', () => {
             test('when resolving a relative path from a regular path, it should return a ResolvedPath instance where absEsmFile contains the file path with mjs extension', () => {
                 // Arrange
                 mock({
-                    "c:\\path\\to.mjs": "",
+                    "c:\\project\\path\\to.mjs": "",
                 });
                 const path = "./to";
-                const from = "c:\\path\\from.js";
+                const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
                     absCjsFile: "",
-                    absEsmFile: "c:\\path\\to.mjs",
-                    originalPath: "./to",
+                    absEsmFile: "c:\\project\\path\\to.mjs",
+                    originalPath: ".\\path\\to",
                     packageJsonExports: false
                 }
         
@@ -75,14 +77,14 @@ describe('Resolver class', () => {
             test('when resolving a relative path from a regular path, it should return a ResolvedPath instance where absCjsFile contains the file path with cjs extension', () => {
                 // Arrange
                 mock({
-                    "c:\\path\\to.cjs": "",
+                    "c:\\project\\path\\to.cjs": "",
                 });
                 const path = "./to";
-                const from = "c:\\path\\from.js";
+                const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
-                    absCjsFile: "c:\\path\\to.cjs",
+                    absCjsFile: "c:\\project\\path\\to.cjs",
                     absEsmFile: "",
-                    originalPath: "./to",
+                    originalPath: ".\\path\\to",
                     packageJsonExports: false
                 }
         
@@ -99,8 +101,8 @@ describe('Resolver class', () => {
                 // Arrange
                 const jsonFileContent = { main: "./index.js"};
                 mock({
-                    "c:\\path\\node_modules\\nodeModule\\index.js": "",
-                    "c:\\path\\node_modules\\nodeModule\\package.json": JSON.stringify(jsonFileContent),
+                    "c:\\project\\path\\node_modules\\nodeModule\\index.js": "",
+                    "c:\\project\\path\\node_modules\\nodeModule\\package.json": JSON.stringify(jsonFileContent),
                 });
                 packageManager.getPackageJSON.mockReturnValue({
                     ...jsonFileContent,
@@ -109,9 +111,9 @@ describe('Resolver class', () => {
                     }
                 });            
                 const path = "nodeModule";
-                const from = "c:\\path\\from.js";
+                const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
-                    absCjsFile: "c:\\path\\node_modules\\nodeModule\\index.js",
+                    absCjsFile: "c:\\project\\path\\node_modules\\nodeModule\\index.js",
                     absEsmFile: "",
                     originalPath: "nodeModule",
                     packageJsonExports: false
@@ -129,19 +131,19 @@ describe('Resolver class', () => {
             test('when resolving an alias from a regular path, it should return a ResolvedPath instance where absEsmFile contains the file path', () => {
                 // Arrange
                 mock({
-                    "c:\\path\\alias\\file.js": "",
+                    "c:\\project\\path\\alias\\file.js": "",
                 });
                 const path = "alias\\file.js";
-                const from = "c:\\path\\from.js";
+                const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
                     absCjsFile: "",
-                    absEsmFile: "c:\\path\\alias\\file.js",
-                    originalPath: "alias\\file.js",
+                    absEsmFile: "c:\\project\\path\\alias\\file.js",
+                    originalPath: ".\\path\\alias\\file.js",
                     packageJsonExports: false
                 }
         
                 // Act
-                resolver.appendAlias({ alias: "c:\\path\\alias" })
+                resolver.appendAlias({ alias: "c:\\project\\path\\alias" })
                 const result = resolver.resolve(path,from);
         
                 // Assert
@@ -160,14 +162,14 @@ describe('Resolver class', () => {
             test('when resolving a path of a directory, it should return a ResolvedPath instance where absEsmFile contains the file path of the barrel file (index.js)', () => {
                 // Arrange
                 mock({
-                    "c:\\path\\barrel\\index.js": "",
+                    "c:\\project\\path\\barrel\\index.js": "",
                 });
                 const path = "./barrel";
-                const from = "c:\\path\\from.js";
+                const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
                     absCjsFile: "",
-                    absEsmFile: "c:\\path\\barrel\\index.js",
-                    originalPath: "./barrel",
+                    absEsmFile: "c:\\project\\path\\barrel\\index.js",
+                    originalPath: ".\\path\\barrel",
                     packageJsonExports: false
                 }
         
@@ -182,17 +184,17 @@ describe('Resolver class', () => {
                 // Arrange
                 const jsonFileContent = {main: "./cjs.js", module: "./esm.js"};
                 mock({
-                    "c:\\path\\packageMainAndModule\\package.json": JSON.stringify(jsonFileContent),
-                    "c:\\path\\packageMainAndModule\\cjs.js": "",
-                    "c:\\path\\packageMainAndModule\\esm.js": "",
+                    "c:\\project\\path\\packageMainAndModule\\package.json": JSON.stringify(jsonFileContent),
+                    "c:\\project\\path\\packageMainAndModule\\cjs.js": "",
+                    "c:\\project\\path\\packageMainAndModule\\esm.js": "",
                 });
                 mockPackageManager(jsonFileContent)
                 const path = "./packageMainAndModule";
-                const from = "c:\\path\\from.js";
+                const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
-                    absCjsFile: "c:\\path\\packageMainAndModule\\cjs.js",
-                    absEsmFile: "c:\\path\\packageMainAndModule\\esm.js",
-                    originalPath: "./packageMainAndModule",
+                    absCjsFile: "c:\\project\\path\\packageMainAndModule\\cjs.js",
+                    absEsmFile: "c:\\project\\path\\packageMainAndModule\\esm.js",
+                    originalPath: ".\\path\\packageMainAndModule",
                     packageJsonExports: false
                 }
         
@@ -207,16 +209,16 @@ describe('Resolver class', () => {
                 // Arrange
                 const jsonFileContent = {main: "./cjs.js"};
                 mock({
-                    "c:\\path\\packageMain\\package.json": JSON.stringify(jsonFileContent),
-                    "c:\\path\\packageMain\\cjs.js": "",
+                    "c:\\project\\path\\packageMain\\package.json": JSON.stringify(jsonFileContent),
+                    "c:\\project\\path\\packageMain\\cjs.js": "",
                 });
                 mockPackageManager(jsonFileContent)
                 const path = "./packageMain";
-                const from = "c:\\path\\from.js";
+                const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
-                    absCjsFile: "c:\\path\\packageMain\\cjs.js",
+                    absCjsFile: "c:\\project\\path\\packageMain\\cjs.js",
                     absEsmFile: "",
-                    originalPath: "./packageMain",
+                    originalPath: ".\\path\\packageMain",
                     packageJsonExports: false
                 }
         
@@ -231,16 +233,16 @@ describe('Resolver class', () => {
                 // Arrange
                 const jsonFileContent = {type: "module", main: "./esm.js"};
                 mock({
-                    "c:\\path\\packageModule\\package.json": JSON.stringify(jsonFileContent),
-                    "c:\\path\\packageModule\\esm.js": "",
+                    "c:\\project\\path\\packageModule\\package.json": JSON.stringify(jsonFileContent),
+                    "c:\\project\\path\\packageModule\\esm.js": "",
                 });
                 mockPackageManager(jsonFileContent)
                 const path = "./packageModule";
-                const from = "c:\\path\\from.js";
+                const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
                     absCjsFile: "",
-                    absEsmFile: "c:\\path\\packageModule\\esm.js",
-                    originalPath: "./packageModule",
+                    absEsmFile: "c:\\project\\path\\packageModule\\esm.js",
+                    originalPath: ".\\path\\packageModule",
                     packageJsonExports: false
                 }
         

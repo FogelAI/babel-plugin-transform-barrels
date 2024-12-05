@@ -140,7 +140,7 @@ describe("aliases", () => {
 
   test("transformation of jest alias", () => {
     const alias = Object.entries({
-      "^abc/(.*)$": "./components/$1"
+      "^abc/(.*)$": ospath.resolve(__dirname, "./components/$1")
     });
     const pluginOptions = { executorName: "jest", alias: alias };
     expect(
@@ -208,6 +208,18 @@ describe("modules directories", () => {
         pluginOptions
       )
     ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+  });
+
+  test("resolve module file - absolute path", () => {
+    const modulesDirs = [ospath.resolve(__dirname), 'node_modules'];
+    const pluginOptions = { executorName: "webpack", modulesDirs: modulesDirs };
+    expect(
+      pluginTransform(
+        'import { logger } from "logger";',
+        __filename,
+        pluginOptions
+      )
+    ).toBe(`import { logger } from \"logger\";`);
   });
 });
 
