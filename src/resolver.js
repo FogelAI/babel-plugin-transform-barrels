@@ -48,7 +48,9 @@ class Resolver {
         if (resolvedPath) return resolvedPath;
         resolvedPath = this.resolveAbsoluteModuleDirs(originalPath, fromDir);
         if (resolvedPath) return resolvedPath;
-        return this.resolveNodeModules(originalPath, fromDir);
+        resolvedPath = this.resolveNodeModules(originalPath, fromDir);
+        if (resolvedPath) return resolvedPath;
+        throw new ResolveError(`Unable to resolve the ${path} path from the ${from} file`, path, {...this});
     }    
 
     resolveRegularPaths(path, fromDir) {
@@ -225,6 +227,15 @@ class ResolvedPath {
 
   get isDual() {
     return (this.absEsmFile && this.absCjsFile);
+  }
+}
+
+class ResolveError extends Error {
+  constructor(message, path, resolverObj) {
+      super(message);
+      this.name = 'ResolveError';
+      this.path = path;
+      this.resolverObj = resolverObj;
   }
 }
 

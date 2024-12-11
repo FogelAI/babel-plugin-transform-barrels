@@ -6,6 +6,7 @@ const resolver = require("./resolver");
 const BarrelFileManagerFacade = require("./barrel");
 const pluginOptions = require("./pluginOptions");
 const logger = require("./logger");
+const { packageManager } = require("./packages");
 
 const importDeclarationVisitor = (path, state) => {
   const importsSpecifiers = path.node.specifiers;
@@ -61,6 +62,8 @@ module.exports = function (babel) {
       pluginOptions.setOptions(plugin.options);
       const { options } = pluginOptions;
       logger.setOptions(options.logging);
+      const babelPackageJsonContent = packageManager.getNearestPackageJsonContent(__dirname);
+      logger.log(`Babel-plugin-transform-barrels version: ${babelPackageJsonContent.version}`);
       logger.log(`Processed Javascript file: ${state.opts.filename}`);
       const executor = ExecutorFactory.createExecutor(options.executorName, options.alias, options.extensions);
       resolver.appendAlias(executor.getAlias());
@@ -72,8 +75,25 @@ module.exports = function (babel) {
       BarrelFileManagerFacade.saveToCacheAllPackagesBarrelFiles();
     },
     visitor: {
-      ImportDeclaration: importDeclarationVisitor,
-      ExpressionStatement: expressionStatementVisitor,
+      ImportDeclaration: wrapWithErrorHandling(importDeclarationVisitor, "ImportDeclaration"),
+      ExpressionStatement: wrapWithErrorHandling(expressionStatementVisitor, "ExpressionStatement"),
     },
   };
 };
+
+const wrapWithErrorHandling = (visitorFunction, visitorName)=> {
+  return function (path, state) {
+    try {
+      visitorFunction(path, state);
+    } catch(err) {
+      if (err.name === "ResolveError") {
+        logger.log([
+          `${err.name}: ${visitorName}: ${err.message}`,
+          `Resolver object properties: ${JSON.stringify(err.resolverObj, null, 2)}`,
+          `Error stack: ${err.stack}`
+        ].join("\n"));  
+      }
+      throw err;    
+    }
+  }
+}

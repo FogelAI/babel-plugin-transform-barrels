@@ -253,5 +253,23 @@ describe('Resolver class', () => {
                 expect(result).toEqual(expectedResult);
             }); 
         });
+
+        describe('when resolving wrong path', () => {
+            test('when resolving relative paths, it should throw a resolve error', () => {
+                // Arrange
+                mock({
+                    "c:\\project\\path\\to.js": "",
+                });
+                const path = "./to_wrong_path";
+                const from = "c:\\project\\path\\from.js";
+                const expectedResult = `Unable to resolve the ${path} path from the ${from} file`;
+        
+                // Act
+                const result = ()=> resolver.resolve(path,from)
+        
+                // Assert
+                expect(result).toThrow(expectedResult);
+            });
+        });
     });
 });
