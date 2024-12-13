@@ -31,6 +31,7 @@ class Resolver {
 
     setModulesDirs(modulesDirs) {
       this.modulesDirs = [];
+      this.absModuleDirs = [];
       for (const moduleDir of modulesDirs) {
         if (ospath.isAbsolute(moduleDir)) {
           this.absModuleDirs.push(moduleDir);
