@@ -136,6 +136,11 @@ class PathFunctions {
     static isSpecialCharInBundlerPathImport(importPath) {
       return importPath.search(/[?:]/) !== -1;
     }
+
+    static isAnyRegexMatch(str, regexArray) {
+      return regexArray.some(regex => new RegExp(regex).test(str));
+    }
+
 }
 
 module.exports = PathFunctions;

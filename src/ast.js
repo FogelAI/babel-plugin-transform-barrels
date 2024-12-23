@@ -107,6 +107,8 @@ class AST {
       if (pluginOptions.options.executorName === "webpack" && importsPath.includes("!")) return true;
       if (PathFunctions.isSpecialCharInBundlerPathImport(importsPath)) return true;
       if (builtinModules.includes(importsPath)) return true;
+      const { moduleIgnorePatterns } = pluginOptions.options;
+      if (PathFunctions.isAnyRegexMatch(importsPath, moduleIgnorePatterns)) return true;
       return false;
     }    
 }

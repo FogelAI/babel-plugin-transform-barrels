@@ -233,3 +233,17 @@ describe("special module usecases transformation", () => {
     ).toBe(`import async_hooks from \"node:async_hooks";`.replaceAll("\\","\\\\"));
   });
 });
+
+describe("ignore transformations", () => {
+  test("ignore specific transformation with the moduleIgnorePatterns plugin option", () => {
+    const moduleIgnorePatterns = ["./components/Texts"];
+    const pluginOptions = { executorName: "webpack", moduleIgnorePatterns: moduleIgnorePatterns };
+    expect(
+      pluginTransform(
+        'import { RedText } from "./components/Texts";',
+        __filename,
+        pluginOptions
+      )
+    ).toBe(`import { RedText } from "./components/Texts";`.replaceAll("\\","\\\\"));
+  })
+})

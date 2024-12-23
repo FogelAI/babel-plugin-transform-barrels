@@ -6,6 +6,7 @@ class PluginOptions {
         alias: {},
         extensions: [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"],
         modulesDirs: ["node_modules"],
+        moduleIgnorePatterns: [],
         isCacheEnabled: false,
         logging: {
             type: "disabled",
