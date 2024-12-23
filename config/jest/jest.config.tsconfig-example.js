@@ -27,6 +27,9 @@ module.exports = {
     ...convertPathsToModuleNameMapper(tsconfig),
   },
   modulePaths: [tsconfig.compilerOptions.baseUrl],
+  // for nx:
+  // const path = require('path');
+  // modulePaths: [path.resolve(tsconfig.compilerOptions.rootDir)],
   testMatch: [
     "<rootDir>/**/__tests__/**/*.{js,jsx,ts,tsx}",
     "<rootDir>/**/*.{spec,test}.{js,jsx,ts,tsx}",
