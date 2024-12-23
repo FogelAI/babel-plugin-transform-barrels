@@ -47,9 +47,9 @@ class Resolver {
         const originalPath = PathFunctions.isRegularPath(path) ? path : this.convertAliasToOriginal(path);
         resolvedPath = this.resolveRegularPaths(originalPath, fromDir);
         if (resolvedPath) return resolvedPath;
-        resolvedPath = this.resolveAbsoluteModuleDirs(originalPath, fromDir);
-        if (resolvedPath) return resolvedPath;
         resolvedPath = this.resolveNodeModules(originalPath, fromDir);
+        if (resolvedPath) return resolvedPath;
+        resolvedPath = this.resolveAbsoluteModuleDirs(originalPath, fromDir);
         if (resolvedPath) return resolvedPath;
         throw new ResolveError(`Unable to resolve the ${path} path from the ${from} file`, path, {...this});
     }    

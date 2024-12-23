@@ -223,17 +223,20 @@ class BarrelFile {
     
     handleImportDeclaration(node) {
         if (AST.isSpecialImportCases(node)) return false;
-        node.specifiers.forEach((specifier) => {
-            // import {abc, def} from './abc';
-            const specifierObj = SpecifierFactory.createSpecifier("import");
-            specifierObj.importedName = specifier?.imported?.name || "default";
-            specifierObj.localName = specifier.local.name;
-            specifierObj.type = AST.getSpecifierType(specifier);
-            const importPath = node.source.value;
-            specifierObj.esmPath = resolver.resolve(importPath, this.path).absEsmFile;
-            const { localName } = specifierObj;
-            this.importMapping[localName] = specifierObj;
-        });
+        if (AST.isAnySpecifierExist(node.specifiers)) {
+          const importPath = node.source.value;
+          const resolvedPath = resolver.resolve(importPath, this.path).absEsmFile;
+          node.specifiers.forEach((specifier) => {
+              // import {abc, def} from './abc';
+              const specifierObj = SpecifierFactory.createSpecifier("import");
+              specifierObj.importedName = specifier?.imported?.name || "default";
+              specifierObj.localName = specifier.local.name;
+              specifierObj.type = AST.getSpecifierType(specifier);
+              specifierObj.esmPath = resolvedPath;
+              const { localName } = specifierObj;
+              this.importMapping[localName] = specifierObj;
+          });  
+        }
     }
     
     createSpecifiersMapping(forceFullScan = false) {
