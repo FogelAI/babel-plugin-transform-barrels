@@ -1,7 +1,9 @@
 const t = require("@babel/types");
-const AST = require("./ast");
+const generate = require('@babel/generator').default;
 const resolver = require("./resolver");
 const BarrelFileManagerFacade = require("./barrel");
+const PathFunctions = require("./path");
+const logger = require("./logger");
 
 class JestMock {
     static isSpecificObjectFunctionCall(node, objectName, propertyName) {
@@ -11,80 +13,130 @@ class JestMock {
       return (nodeObjectName === objectName && nodePropertyName === propertyName);
     }
   
-    constructor() {
+    constructor(path, state) {
+      this.path = path;
+      this.state = state;
       this.modulePath = "";
-      this.properties = [];
       this.barrelImports = new ImportBarrelPaths();
+      this.nonExistKeys = [];
     }
   
-    load(expression) {
-      this.loadArguments(expression);
+    load() {
+      this.loadModulePath();
+      this.loadBarrelFile();
     }
   
-    loadArguments(expression) {
-      const argumentsVar = expression.arguments
+    loadModulePath() {
+      const argumentsVar = this.path.node.expression.arguments;
       this.modulePath = argumentsVar[0].value;
-      this.properties = argumentsVar[1]?.body?.properties || argumentsVar[1]?.body?.body[0]?.argument?.properties || [];
-    }
-  
-    setExpression(expression) {
-      this.load(expression);
     }
 
-    getDirectImportsPathMapping(barrelFile) {
-      const barrelModulePath = this.modulePath;
+    loadBarrelFile() {
+      const parsedJSFile = this.state.filename;
+      const resolvedPathObject = resolver.resolve(this.modulePath ,parsedJSFile);
+      if (resolvedPathObject.packageJsonExports) return;
+      this.barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);
+    }
+
+    getObjectProperties(path) {
+      return path.node.properties;
+    }
+
+    objectExpressionVisitor = (objectPath)=> {
+      const properties = this.getObjectProperties(objectPath);
       const directModules = new ImportBarrelPaths();
-      for (const property of this.properties) {
+      const nonExistKeys = [];
+      for (const property of properties) {
         if (t.isProperty(property)) {
           const importedName = property?.key?.name || "default";
-          const importSpecifier = barrelFile.getDirectSpecifierObject(importedName).toImportSpecifier();
-          const directModulePath = importSpecifier.path;
-          if (!importSpecifier.path) return;
-          directModules.add(barrelModulePath, directModulePath, { type: "property", property: importedName, astValue: property.value });  
-        } else if (t.isSpreadElement(property)) {
-          if (!JestMock.isSpecificObjectFunctionCall(property.argument, "jest", "requireActual")) continue;
-          const requireActualList = this.getRequireActualList(property);
-          for (const requireActual in requireActualList) {
-            directModules.add(barrelModulePath, requireActual, { type: "spreadElement", modulePath: requireActual });  
+          const directSpecifier = this.barrelFile.getDirectSpecifierObject(importedName);
+          if (directSpecifier) {
+            const importSpecifier = directSpecifier.toImportSpecifier();
+            const directImportedName = importSpecifier.importedName;
+            const directModulePath = importSpecifier.path;
+            if (!importSpecifier.path) return;
+            directModules.add(directModulePath, importedName, directImportedName);  
+          } else {
+            nonExistKeys.push(importedName);
           }
         }
       }
-      if (!AST.isAnySpecifierExist(this.properties)) {
-        directModules.map[barrelModulePath] = barrelFile.getAllDirectPaths();
-      }
-      return directModules;
+      this.nonExistKeys = [...this.nonExistKeys, ...nonExistKeys];
+      this.barrelImports = directModules;
+      objectPath.skip();
     }
 
-    getRequireActualList(property) {
-        if (!JestMock.isSpecificObjectFunctionCall(property.argument, "jest", "requireActual")) null;
-        const requireActualModule = property.argument.arguments[0].value;
-        const resolvedPathObject = resolver.resolve(requireActualModule, resolver.from);
-        if (resolvedPathObject.packageJsonExports) return;
-        const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);
-        if (!barrelFile.isBarrelFileContent) return;
-        return barrelFile.getAllDirectPaths();
+    transformedExpressionStatement() {
+      const numOfArguments = this.path.node.expression.arguments.length;
+      if (numOfArguments === 1) {
+        this.barrelImports.map = this.barrelFile.getAllDirectPaths();
+      } else if (numOfArguments === 2) {
+        this.path.traverse({ ObjectExpression: this.objectExpressionVisitor});
+        if (PathFunctions.isObjectEmpty(this.barrelImports.map)) {
+          this.barrelImports.map = this.barrelFile.getAllDirectPaths();
+        }
+      }
+      this.createNewJestMockCallFunction()
+      this.path.remove();
+    }
+
+    newObjectExpressionVisitor = (objectPath)=> {
+      const properties = this.getObjectProperties(objectPath);
+      const barrelModulePath = this.barrelImports.currentBarrelUse;
+      const specifiers = this.barrelImports.get(barrelModulePath);
+      const newProperties = [];
+      for (const property of properties) {
+        const newProperty = t.cloneNode(property);
+        if (t.isProperty(property)) {
+          const importedName = property?.key?.name || "default";
+          if (importedName in specifiers) {
+            newProperty.key.name = specifiers[importedName];
+            newProperties.push(newProperty)
+          } else if (this.nonExistKeys.includes(importedName)) {
+            newProperties.push(newProperty)
+          }
+        } else {
+          newProperties.push(newProperty)
+        }
+      }
+      objectPath.node.properties = newProperties;
+    }
+
+    newCallExpressionVisitor = (objectPath)=> {
+      if (!JestMock.isSpecificObjectFunctionCall(objectPath.node, "jest", "requireActual")) return;
+      if (objectPath.node.arguments[0].value !== this.modulePath) return;
+      objectPath.node.arguments[0] = t.stringLiteral(this.barrelImports.currentBarrelUse);
+    }
+
+    createNewJestMockCallFunction() {
+      const modules = Object.keys(this.barrelImports.map);
+      logger.log(`Source mock line: ${generate(this.path.node, { comments: false, concise: true }).code}`);
+      for (const modulePath of modules) {
+        const clonedNode = t.cloneNode(this.path.node);
+        this.path.insertBefore(clonedNode);
+        const clonedPath = this.path.getSibling(this.path.key - 1)
+        const mockModuleNameParameter = t.stringLiteral(modulePath);
+        clonedPath.node.expression.arguments[0] = mockModuleNameParameter;
+        this.barrelImports.currentBarrelUse = modulePath;
+        clonedPath.traverse({ObjectExpression: this.newObjectExpressionVisitor, CallExpression: this.newCallExpressionVisitor});
+        logger.log(`Transformed mock line: ${generate(clonedPath.node, { comments: false, concise: true }).code}`);
+      }
     }
 }
 
 class ImportBarrelPaths {
   constructor() {
+    this.currentBarrelUse = "";
     this.map = {};
   }
 
-  add(importBarrelPath, importDirectPath, specifier = null) {
-    this.map[importBarrelPath] ??= {}
-    this.map[importBarrelPath][importDirectPath] ??= [];
-    specifier && this.map[importBarrelPath][importDirectPath].push(specifier);
+  add(importDirectPath, importedName, directImportedName) {
+    this.map[importDirectPath] ??= {};
+    this.map[importDirectPath][importedName] = directImportedName;
   }
 
-  get(importBarrelPath, importDirectPath) {
-    if (importBarrelPath) {
-      if (importDirectPath) {
-        return this.map[importBarrelPath][importDirectPath];
-      }
-      return this.map[importBarrelPath];
-    }
-    return this.map;
+  get(importDirectPath) {
+    return this.map[importDirectPath];
   }
   
   hasBarrel(importBarrelPath) {

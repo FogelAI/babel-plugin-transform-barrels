@@ -33,23 +33,15 @@ const importDeclarationVisitor = (path, state) => {
 };
 
 const expressionStatementVisitor = (path, state) => {
-  const jestMockFunction = new JestMock();
   if (!(pluginOptions.options.executorName === "jest")) return;
   if (!JestMock.isSpecificObjectFunctionCall(path.node.expression, "jest", "mock")) return;
   if (AST.isSpecialImportCases(path.node)) return;
-  jestMockFunction.setExpression(path.node.expression);
-  const { modulePath } = jestMockFunction;
+  const jestMockFunction = new JestMock(path, state);
   const parsedJSFile = state.filename;
   resolver.from = parsedJSFile;
-  const resolvedPathObject = resolver.resolve(modulePath ,parsedJSFile);
-  if (resolvedPathObject.packageJsonExports) return;
-  const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);
-  if (!barrelFile.isBarrelFileContent) return;
-  const directImportsPathMapping = jestMockFunction.getDirectImportsPathMapping(barrelFile).get(modulePath);
-  const transformedASTImport = AST.createASTJestMockCallFunction(directImportsPathMapping);
-  logger.log(`Source mock line: ${generate(path.node, { comments: false, concise: true }).code}`);
-  transformedASTImport.forEach(line=> logger.log(`Transformed mock line: ${generate(line).code}`));
-  path.replaceWithMultiple(transformedASTImport)
+  jestMockFunction.load();
+  if (!jestMockFunction.barrelFile.isBarrelFileContent) return;
+  jestMockFunction.transformedExpressionStatement();
 }
 
 module.exports = function (babel) {
