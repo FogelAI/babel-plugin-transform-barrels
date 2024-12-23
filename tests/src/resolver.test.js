@@ -131,19 +131,19 @@ describe('Resolver class', () => {
             test('when resolving an alias from a regular path, it should return a ResolvedPath instance where absEsmFile contains the file path', () => {
                 // Arrange
                 mock({
-                    "c:\\project\\path\\alias\\file.js": "",
+                    "c:\\project\\path\\alias\\aliasfile.js": "",
                 });
                 const path = "alias\\file.js";
                 const from = "c:\\project\\path\\from.js";
                 const expectedResult = {
                     absCjsFile: "",
-                    absEsmFile: "c:\\project\\path\\alias\\file.js",
-                    originalPath: ".\\path\\alias\\file.js",
+                    absEsmFile: "c:\\project\\path\\alias\\aliasfile.js",
+                    originalPath: ".\\path\\alias\\aliasfile.js",
                     packageJsonExports: false
                 }
         
                 // Act
-                resolver.appendAlias({ alias: "c:\\project\\path\\alias" })
+                resolver.appendAlias({ alias: "c:\\project\\path\\alias\\aliasfile.js" })
                 const result = resolver.resolve(path,from);
         
                 // Assert

@@ -140,17 +140,21 @@ describe("aliases", () => {
 
   test("transformation of jest alias", () => {
     const alias = Object.entries({
-      "^abc/(.*)$": ospath.resolve(__dirname, "./components/$1")
+      "^abc/(.*)$": ospath.resolve(__dirname, "./components/$1"),
+      '/spinner.json$': ospath.resolve(__dirname, './components/Texts/index.js'),
     });
-    const pluginOptions = { executorName: "jest", alias: alias };
+    const pluginOptions = { executorName: "jest", alias: alias, logging: {type: "file"} };
     expect(
-      pluginTransform(
-        'import { Text } from "abc/Texts";',
+      pluginTransform([
+          'import { Text } from "abc/Texts";',
+          'import { RedText } from "components/Texts/spinner.json";',
+        ].join("\n"),
         __filename,
         pluginOptions
       )
     ).toBe([
       `import { Text } from \"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js";`,
+      `import { RedText } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 });

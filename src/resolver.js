@@ -159,8 +159,14 @@ class Resolver {
         const regexPattern = alias;
         const regex = new RegExp(regexPattern);
         if (regex.test(path)) {
-          const originalPath = path.replace(regex, aliasDestination);
-          return originalPath;
+          const dollarNumberRegex = new RegExp(/\$([0-9]+)/g);
+          if (dollarNumberRegex.test(aliasDestination)) {
+            const originalPath = path.replace(regex, aliasDestination);
+            return originalPath;
+          } else {
+            const originalPath = aliasDestination;
+            return originalPath;
+          }
         }
       }
       return path;

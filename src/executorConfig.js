@@ -115,7 +115,17 @@ class ViteStrategy {
   }
 
   prepareAlias(alias) {
-      return alias;
+      return this.addPrefixRegexToAliases(alias);
+  }
+
+  addPrefixRegexToAliases(aliasObj) {
+    if (PathFunctions.isObjectEmpty(aliasObj)) return;
+    const newAliasObj = {};
+    const aliases = Object.keys(aliasObj);
+    for (const alias of aliases) {
+      newAliasObj[`^${alias}((?:[\\/]|$))`] = `${aliasObj[alias]}$1`;
+    }
+    return newAliasObj;  
   }
 }
 
