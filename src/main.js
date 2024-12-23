@@ -49,6 +49,7 @@ module.exports = function (babel) {
   return {
     name: PLUGIN_KEY,
     pre(state) {
+      resolver.resetDefaults();
       const plugins = state.opts.plugins;
       const plugin = plugins.find(plugin => plugin.key === PLUGIN_KEY);
       pluginOptions.setOptions(plugin.options);

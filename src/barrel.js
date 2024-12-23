@@ -303,7 +303,7 @@ class BarrelFile {
     getDirectSpecifierObject(specifierExportedName) {
       return this.exportMapping[specifierExportedName] ?
           this.exportMapping[specifierExportedName] : 
-          this.defaultPatternExport.getSpecifier(specifierExportedName);
+          (this.defaultPatternExport.isDefaultPatternCreated && this.defaultPatternExport.getSpecifier(specifierExportedName));
     }    
 }
 
