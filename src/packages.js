@@ -50,12 +50,16 @@ class Package {
     }
 
     resolveExports(importPath) {
-        for (const exportKey in this.exports) {
+        if (!this.exports) return null;
+        for (const [exportKey, exportValue] of Object.entries(this.exports)) {
             const normalizedExportKey = ospath.join(this.name, exportKey);
-            if ((typeof this.exports[exportKey] === "object") && (normalizedExportKey === importPath) && ("require" in this.exports[exportKey]) && ("import" in this.exports[exportKey])) {
+            const isObject = typeof exportValue === "object";
+            const isPathMatch = normalizedExportKey === importPath;
+            const hasRequiredKeys = ["require", "import"].every(key => Object.keys(exportValue).includes(key));
+            if (isObject && isPathMatch && hasRequiredKeys) {
                 return {
-                    absCjsFile: this.exports[exportKey]["require"],
-                    absEsmFile: this.exports[exportKey]["import"]
+                    absCjsFile: exportValue.require?.default || exportValue.require,
+                    absEsmFile: exportValue.import?.default || exportValue.import
                 }
             }
         }
