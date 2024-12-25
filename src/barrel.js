@@ -208,6 +208,7 @@ class BarrelFile {
         const exportPath = node.source.value;
         const resolvedPathObject = resolver.resolve(exportPath, this.path);
         let absoluteExportedPath = resolvedPathObject.absEsmFile;
+        if (!absoluteExportedPath) return;
         const exportedAllFile = new BarrelFile(absoluteExportedPath);
         exportedAllFile.defaultPatternExport.isDefaultPatternCreated = true;
         exportedAllFile.resolvedPathObject = resolvedPathObject;
