@@ -114,6 +114,7 @@ class BarrelFile {
     handleExportNamedDeclaration(node) {
         if (node.specifiers.length > 0) {
           node.specifiers.forEach((specifier) => {
+            if (SkippingCases.isTypeExport(specifier)) return true;
             let specifierObj = SpecifierFactory.createSpecifier("export");
             specifierObj.exportedName = specifier.exported.name;
             specifierObj.localName = specifier?.local?.name;
@@ -231,6 +232,7 @@ class BarrelFile {
           const normalizedResolvedPath = PathFunctions.normalizeModulePath(resolvedPath);
           node.specifiers.forEach((specifier) => {
               // import {abc, def} from './abc';
+              if (SkippingCases.isTypeImport(specifier)) return;
               const specifierObj = SpecifierFactory.createSpecifier("import");
               specifierObj.importedName = specifier?.imported?.name || "default";
               specifierObj.localName = specifier.local.name;
@@ -250,7 +252,7 @@ class BarrelFile {
             // export { abc };
             // export function abc(){};
             // export const abc = 5, def = 10;
-            if (node.exportKind === "type") return true;
+            if (SkippingCases.isTypeExport(node)) return true;
             if (node.declaration && !forceFullScan) {
               this.resetProperties();
               return false;

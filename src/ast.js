@@ -76,6 +76,16 @@ class SkippingCases {
     if (PathFunctions.isAnyRegexMatch(importsPath, moduleIgnorePatterns)) return true;
   }
 
+  static isTypeImport(node) {
+    // Typescript
+    if (node.importKind === "type") return true;
+  }
+
+  static isTypeExport(node) {
+    // Typescript
+    if (node.exportKind === "type") return true;
+  }
+
   static isOneOfPathSkippingCases(node) {
     const importsPath = node.source?.value || node.expression.arguments[0].value;
     if (
@@ -92,6 +102,7 @@ class SkippingCases {
     if (
       SkippingCases.isNamespaceImport(importsSpecifiers) ||
       SkippingCases.isSideEffectImport(importsSpecifiers) ||
+      SkippingCases.isTypeImport(node) ||
       SkippingCases.isOneOfPathSkippingCases(node)
     ) {
       return true;

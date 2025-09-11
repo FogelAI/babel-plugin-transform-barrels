@@ -20,16 +20,17 @@ class BarrelImportTransformer {
         const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPath);
         if (!barrelFile.isBarrelFileContent) return;
         const directSpecifierASTArray = this.transformSpecifiers(importsSpecifiers, barrelFile);
-        if (!directSpecifierASTArray) return;
+        if (directSpecifierASTArray.length === 0) return null;
         path.replaceWithMultiple(directSpecifierASTArray);          
     }
 
     transformSpecifiers (importsSpecifiers, barrelFile) {
         const directSpecifierASTArray = [];
         for (const specifier of importsSpecifiers) {
+          if (SkippingCases.isTypeImport(specifier)) continue;
           const importedName = specifier?.imported?.name || "default";
           const importSpecifier = barrelFile.getDirectSpecifierObject(importedName).toImportSpecifier();
-          if (!importSpecifier.path) return;
+          if (!importSpecifier.path) return [];
           importSpecifier.localName = specifier.local.name;
           const transformedASTImport = AST.createASTImportDeclaration(importSpecifier);
           this.logger.log(`Transformed import line: ${generate(transformedASTImport).code}`);
