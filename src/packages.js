@@ -1,5 +1,56 @@
 const ospath = require("path");
-const PathFunctions = require("./path");
+const { PathFunctions, TypesFunctions } = require("./utils");
+const { BuildInFileSystem: FileSystem, SerializedFile } = require('./buildInFileSystem');
+const { JsonSerializer } = require('./serializers');
+
+const fileSystem = new FileSystem(PathFunctions);
+
+class PackagePathResolver {
+    static #getPackageJsonDir(path, type) {
+        let highestPackageJsonDir;
+        let currentDir = path;
+        let lastSegment;
+        while (currentDir && lastSegment!=="node_modules") {
+            const packagePath = ospath.join(currentDir, "package.json");
+            if (fileSystem.fileExists(packagePath)) {
+                if (type === "nearest") return currentDir;
+                highestPackageJsonDir = currentDir;
+            }
+            currentDir = currentDir.substring(0, currentDir.lastIndexOf(ospath.sep));
+            lastSegment = ospath.basename(currentDir);
+        }
+        return highestPackageJsonDir;
+    }
+
+    static #getNearestPackageJsonDir(path) {
+        return PackagePathResolver.#getPackageJsonDir(path,"nearest");
+    }
+
+    static getNearestPackageJsonPath(path) {
+        const packageJsonDir = PackagePathResolver.#getNearestPackageJsonDir(path);
+        const packageJsonPath = ospath.join(packageJsonDir, "package.json");
+        return packageJsonPath;
+    }
+
+    static getNearestPackageJsonContent(path) {
+        const packagePath = PackagePathResolver.getNearestPackageJsonPath(path);
+        if (!packagePath) return "";
+        const packageManager = new PackageManager();
+        const packageObj = packageManager.getPackageJSON(packagePath);
+        return packageObj;
+    }
+
+    static getHighestParentPackageDir(path) {
+        if (!PathFunctions.isNodeModule(path)) return process.cwd();
+        return PackagePathResolver.#getPackageJsonDir(path, "highest");
+    }  
+
+    static getHighestPackageJSONPath(path) {
+        const highestParentPackageDir = PackagePathResolver.getHighestParentPackageDir(path);
+        const highestParentPackagePath = ospath.join(highestParentPackageDir, "package.json");
+        return highestParentPackagePath;
+    }
+}
 
 class Package {
     constructor(path) {
@@ -8,38 +59,19 @@ class Package {
         this.data;
     }
 
-    static getHighestParentPackageDir(path) {
-        if (!PathFunctions.isNodeModule(path)) return process.cwd();
-        let highestPackageJsonDir;
-        let currentDir = path;
-        let lastSegment;
-        while (currentDir && lastSegment!=="node_modules") {
-            const packagePath = ospath.join(currentDir, "package.json");
-            if (PathFunctions.fileExists(packagePath)) {
-                highestPackageJsonDir = currentDir;
-            }
-            currentDir = currentDir.substring(0, currentDir.lastIndexOf(ospath.sep));
-            lastSegment = currentDir.split(ospath.sep).pop();
-        }
-        return highestPackageJsonDir;
-    }  
-
-    static getMainPackageJSON(path) {
-        const HighestParentPackageDir = Package.getHighestParentPackageDir(path);
-        const HighestParentPackagePath = ospath.join(HighestParentPackageDir, "package.json");
-        return HighestParentPackagePath;
-    }
-
-    removeNodeModulesPath(path) {
-        const PackageDirName = path.replace(/.:.+node_modules[\/|\\]/g,"");
-        return PackageDirName;
-    }
-
     getPackageName() {
-        if (!PathFunctions.isNodeModule(this.path)) return ".";
+        const localPackageName = ".";
+        if (!PathFunctions.isNodeModule(this.path)) return localPackageName;
         const packageDir = ospath.dirname(this.path);
-        return this.removeNodeModulesPath(packageDir);
+        return PathFunctions.removeNodeModulesPath(packageDir);
     }
+
+    static getMainPackageNameFromPath(path) {
+        const moduleDir = ospath.dirname(path)
+        const mainPackagePath = PackagePathResolver.getHighestParentPackageDir(moduleDir);
+        const packageName = PathFunctions.normalizeModulePath(mainPackagePath);
+        return packageName;
+    }    
 
     get exports() {
         return this.data.exports;
@@ -47,22 +79,6 @@ class Package {
 
     set exports(value) {
         this.data.exports = value;
-    }
-
-    resolveExports(importPath) {
-        if (!this.exports) return null;
-        for (const [exportKey, exportValue] of Object.entries(this.exports)) {
-            const normalizedExportKey = ospath.join(this.name, exportKey);
-            const isObject = typeof exportValue === "object";
-            const isPathMatch = normalizedExportKey === importPath;
-            const hasRequiredKeys = ["require", "import"].every(key => Object.keys(exportValue).includes(key));
-            if (isObject && isPathMatch && hasRequiredKeys) {
-                return {
-                    absCjsFile: exportValue.require?.default || exportValue.require,
-                    absEsmFile: exportValue.import?.default || exportValue.import
-                }
-            }
-        }
     }
 
     get main() {
@@ -77,12 +93,126 @@ class Package {
         return this.data.module;
     }
 
+    get isNodeModule() {
+        return PathFunctions.isNodeModule(this.path);
+    }
+
+    get type() {
+        return this.data.type || "commonjs";
+    }
+
+    get version() {
+        return this.data.version;
+    }
+
+    get workspaces() {
+        return this.data.workspaces;
+    }
+
+    set workspaces(value) {
+        this.data.workspaces = value;
+    }
+
+    #normalizeMainField() {
+        if (this.main) {
+            if (!ospath.extname(this.main)) {
+                const cjsFolder = ospath.dirname(this.path);
+                const fullPath = require.resolve(ospath.join(cjsFolder, this.main))
+                const modulePath = PathFunctions.normalizeModulePath(fullPath);
+                this.main = ospath.relative(this.name, modulePath);
+            }
+        }
+    }
+
+    #normalizeExportsField() {
+        if (!this.exports) return;
+        if (typeof this.exports === 'string') {
+            this.exports = {".": this.exports};
+        } else if (typeof this.exports === 'object') {
+            if (!TypesFunctions.isObjectEmpty(this.exports) && !Object.keys(this.exports)[0].startsWith(".")) {
+                this.exports = {".": this.exports};    
+            }
+        }
+    }  
+
+    #normalizeWorkspacesField() {
+        if (this.workspaces) {
+            if (!Array.isArray(this.workspaces)) {
+                this.workspaces = this.workspaces.packages || [];    
+            }
+        }
+    }
+
+    #normalizeFields() {
+        this.#normalizeMainField();
+        this.#normalizeExportsField();
+        this.#normalizeWorkspacesField();
+    }
+
+    load() {
+        const jsonFile = new SerializedFile(fileSystem, new JsonSerializer());
+        const packageJsonObj = jsonFile.read(this.path);
+        this.data = packageJsonObj;
+        this.#normalizeFields();
+    }
+}
+
+class PackageDualModule {
+    constructor(packageObj) {
+        this.packageObj = packageObj;
+    }
+
+    static getPackageEntryByType(packageObj, moduleType) {
+        const { main, type, module } = packageObj;
+        if (moduleType === "module") {
+          const moduleShortPath = module || (type === "module" && main);
+          return moduleShortPath;
+        } else {
+          const moduleShortPath = type === "commonjs" && main;
+          return moduleShortPath;
+        }
+    }
+
+    static getPackageExportsEntryByType(packageObj, modulePath, moduleType) {
+        if (!packageObj.exports) return;
+        for (const [exportKey, exportValue] of Object.entries(packageObj.exports)) {
+          const normalizedExportKey = ospath.join(packageObj.name, exportKey);
+          const isPathMatch = normalizedExportKey === modulePath;
+          if (!isPathMatch) continue;
+          if (typeof exportValue === "string") {
+            const moduleRelativePath = packageObj.type === moduleType && exportValue;
+            return moduleRelativePath;
+          } else if (typeof exportValue === "object") {
+            const moduleTypeExportsKey = moduleType === "commonjs" ? ["require"] : ["module", "import"];
+            const moduleKey = [...moduleTypeExportsKey, "default"].find((key)=>key in exportValue);
+            if (!moduleKey) return;
+            const moduleRelativePath = exportValue?.[moduleKey]?.default || exportValue?.[moduleKey];
+            return moduleRelativePath;
+          } else {
+            return;
+          }
+        }
+    }
+
+    #getEntryByType(moduleType) {
+        const cjsPackageExportsEntry = PackageDualModule.getPackageExportsEntryByType(this.packageObj, this.packageObj.name, moduleType);
+        if (cjsPackageExportsEntry) {
+            return ospath.join(this.packageObj.name, cjsPackageExportsEntry);
+        }
+        const cjsPackageEntry = PackageDualModule.getPackageEntryByType(this.packageObj, moduleType);
+        if (cjsPackageEntry) {
+            return ospath.join(this.packageObj.name, cjsPackageEntry);
+        };
+    }
+
     get cjsEntry() {
-        return this.type === "commonjs" && this.main && ospath.join(this.name, this.main);
+        const entry = this.#getEntryByType("commonjs");
+        return entry;
     }
 
     get esmEntry() {
-        return this.module && ospath.join(this.name, this.module);
+        const entry = this.#getEntryByType("module");
+        return entry;
     }
 
     get cjsFolder() {
@@ -94,102 +224,47 @@ class Package {
     }
 
     get cjsExtension() {
-        return this.cjsEntry && ospath.extname(this.cjsEntry)
+        return this.cjsEntry && PathFunctions.getMultiExtension(this.cjsEntry)
     }
 
     get esmExtension() {
-        return this.esmEntry && ospath.extname(this.esmEntry)
-    }
-
-    get type() {
-        return this.data.type || "commonjs";
-    }
-
-    get version() {
-        return this.data.version;
+        return this.esmEntry && PathFunctions.getMultiExtension(this.esmEntry)
     }
 
     convertESMToCJSPath(path) {
         const replacedPathExt = PathFunctions.replaceFileExtension(path, this.cjsExtension);
         return replacedPathExt.replace(this.esmFolder, this.cjsFolder);
     }
-
-    normalizeMainField() {
-        if (this.main) {
-            if (!ospath.extname(this.main)) {
-                const cjsFolder = ospath.dirname(this.path);
-                const fullPath = require.resolve(ospath.join(cjsFolder, this.main))
-                const modulePath = PathFunctions.normalizeModulePath(fullPath);
-                this.main = ospath.relative(this.name, modulePath);
-            }
-        }
-    }
-
-    normalizeExportsField() {
-        if (!this.exports || typeof this.exports === 'string') return;
-        const key = ".";
-        if (!(key in this.exports)) this.exports = {".": this.exports};
-    }  
-
-    normalizeFields() {
-        this.normalizeMainField();
-        this.normalizeExportsField();
-    }
-
-    load() {
-        const packageJsonObj = require(this.path);
-        this.data = packageJsonObj;
-        this.normalizeFields();
-    }
 }
 
-let instance;
-
 class PackageManager {
+    static instance;
+
     constructor() {
-      this.packages = new Map();
-      if (instance) {
-        throw new Error("You can only create one instance!");
+      if (!PackageManager.instance) {
+        this.packages = new Map();
+        PackageManager.instance = this;
       }
-      instance = this;
-    }
-
-    getNearestPackageJsonPath(path) {
-        let currentDir = ospath.dirname(path);
-        while (currentDir) {
-            const packagePath = ospath.join(currentDir, "package.json");
-            if (PathFunctions.fileExists(packagePath)) {
-                return packagePath;
-            }
-            currentDir = currentDir.substring(0, currentDir.lastIndexOf(ospath.sep));
-        }
-    }
-
-    getNearestPackageJsonContent(path) {
-        const packagePath = this.getNearestPackageJsonPath(path);
-        if (!packagePath) return "";
-        const packageObj = require(packagePath);
-        return packageObj;
+      return PackageManager.instance;
     }
 
     getMainPackageOfModule(modulePath) {
       const moduleDir = ospath.dirname(modulePath)
-      const mainPackageJSONFile = Package.getMainPackageJSON(moduleDir);
-      const packageObj = this.getPackageJSON(mainPackageJSONFile);
-      return packageObj;
+      const mainPackageJSONFile = PackagePathResolver.getHighestPackageJSONPath(moduleDir);
+      let packageObj = new Package(mainPackageJSONFile);
+      if (!this.packages.has(packageObj.name)) {
+        packageObj.load();
+        this.packages.set(packageObj.name, packageObj);
+      }
+      packageObj = this.packages.get(packageObj.name);
+      return packageObj;  
     };
 
     getPackageJSON(packageJSONFile) {
         let packageObj = new Package(packageJSONFile);
-        if (!this.packages.has(packageObj.name)) {
-          packageObj.load();
-          this.packages.set(packageObj.name, packageObj);
-        }
-        packageObj = this.packages.get(packageObj.name);
+        packageObj.load();
         return packageObj;  
     }
 }
 
-const singletonPackageManager = new PackageManager();
-
-module.exports = { Package, packageManager: singletonPackageManager };
+module.exports = { PackagePathResolver, Package, PackageDualModule, PackageManager };

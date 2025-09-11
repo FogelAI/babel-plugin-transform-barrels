@@ -4,7 +4,10 @@ const plugin = require("../");
 function transform(input, fileName, options) {
     const transformedCode = babel.transformSync(input, {
         plugins: [[plugin, options]],
-        filename: fileName
+        filename: fileName,
+        parserOpts: {
+          plugins: ["jsx", "typescript"]
+        }
       });
     return transformedCode.code;
 }

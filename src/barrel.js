@@ -1,11 +1,14 @@
 const ospath = require("path");
 const t = require("@babel/types");
-const AST = require("./ast");
-const PathFunctions = require("./path");
-const resolver = require("./resolver");
-const { Package, packageManager } = require("./packages");
-const Cache = require("./cache");
+const { AST, SkippingCases } = require("./ast");
+const { PathFunctions, TypesFunctions } = require("./utils");
+const { ResolverFactory } = require("./resolver");
+const { Package, PackageDualModule, PackageManager } = require("./packages");
+const { FileCacheFactory } = require("./cache");
 const pluginOptions = require("./pluginOptions");
+const logger = require("./logger");
+
+const packageManager = new PackageManager();
 
 class DefaultPatternExport {
   constructor() {
@@ -86,7 +89,7 @@ class BarrelFile {
     }    
 
     get isBarrelFileContent() {
-        return !PathFunctions.isObjectEmpty(this.exportMapping) || this.defaultPatternExport.isDefaultPatternCreated;
+        return !TypesFunctions.isObjectEmpty(this.exportMapping) || this.defaultPatternExport.isDefaultPatternCreated;
     }    
 
     resetProperties() {
@@ -114,12 +117,13 @@ class BarrelFile {
             let specifierObj = SpecifierFactory.createSpecifier("export");
             specifierObj.exportedName = specifier.exported.name;
             specifierObj.localName = specifier?.local?.name;
-            specifierObj.type = AST.getSpecifierType(specifier);
-            specifierObj.esmPath = this.path;
+            specifierObj.type = AST.getExportSpecifierType(specifier);
+            specifierObj.esmPath = PathFunctions.normalizeModulePath(this.path);
             if (node.source) {
               // if node.source exist -> export { abc } from './abc';
               const exportPath = node.source.value;
-              specifierObj.esmPath = resolver.resolve(exportPath, this.path).absEsmFile;
+              const resolver = ResolverFactory.lastCreatedInstance;
+              specifierObj.esmPath = PathFunctions.normalizeModulePath(resolver.resolve(exportPath, this.path));
             } else {
               // if node.source doesnt exist -> export { abc };
               const { localName } = specifierObj;
@@ -136,7 +140,6 @@ class BarrelFile {
             }
             const { exportedName } = specifierObj;
             const deepestDirectSpecifier = this.getDeepestDirectSpecifierObject(specifierObj);
-            deepestDirectSpecifier.esmPath = PathFunctions.normalizeModulePath(deepestDirectSpecifier.esmPath);
             if (!this.defaultPatternExport.isMatchDefaultPattern(deepestDirectSpecifier)) {
               this.exportMapping[exportedName] = deepestDirectSpecifier;
             }
@@ -151,11 +154,10 @@ class BarrelFile {
               for (const property of declaration.id.properties) {
                 const specifierObj = SpecifierFactory.createSpecifier("export");
                 specifierObj.type = "named";
-                specifierObj.esmPath = this.path;      
+                specifierObj.esmPath = PathFunctions.normalizeModulePath(this.path);
                 specifierObj.localName = property.value.name;
                 specifierObj.exportedName = property.value.name;
                 const { exportedName } = specifierObj;
-                specifierObj.esmPath = PathFunctions.normalizeModulePath(specifierObj.esmPath);
                 if (!this.defaultPatternExport.isMatchDefaultPattern(specifierObj)) {
                   this.exportMapping[exportedName] = specifierObj;
                 }    
@@ -163,11 +165,10 @@ class BarrelFile {
             } else {
               const specifierObj = SpecifierFactory.createSpecifier("export");
               specifierObj.type = "named";
-              specifierObj.esmPath = this.path;    
+              specifierObj.esmPath = PathFunctions.normalizeModulePath(this.path);
               specifierObj.localName = declaration.id.name;
               specifierObj.exportedName = declaration.id.name;
               const { exportedName } = specifierObj;
-              specifierObj.esmPath = PathFunctions.normalizeModulePath(specifierObj.esmPath);
               if (!this.defaultPatternExport.isMatchDefaultPattern(specifierObj)) {
                 this.exportMapping[exportedName] = specifierObj;
               }  
@@ -206,34 +207,35 @@ class BarrelFile {
     handleExportAllDeclaration(node) {
         // export * from './abc';
         const exportPath = node.source.value;
-        const resolvedPathObject = resolver.resolve(exportPath, this.path);
-        let absoluteExportedPath = resolvedPathObject.absEsmFile;
+        const resolver = ResolverFactory.lastCreatedInstance;
+        const absoluteExportedPath = resolver.resolve(exportPath, this.path);
         if (!absoluteExportedPath) return;
         const exportedAllFile = new BarrelFile(absoluteExportedPath);
         exportedAllFile.defaultPatternExport.isDefaultPatternCreated = true;
-        exportedAllFile.resolvedPathObject = resolvedPathObject;
         exportedAllFile.createSpecifiersMapping(true);
         delete exportedAllFile.exportMapping["default"];
-        if (resolvedPathObject.packageJsonExports) {
-          for (const exportKey in exportedAllFile.exportMapping) {
-            exportedAllFile.exportMapping[exportKey]["esmPath"] = resolvedPathObject.originalPath;
-          }
+        const normalizedExportedPath = PathFunctions.normalizeModulePath(absoluteExportedPath);
+        for (const exportKey in exportedAllFile.exportMapping) {
+          exportedAllFile.exportMapping[exportKey]["esmPath"] = normalizedExportedPath;
         }
         Object.assign(this.exportMapping, exportedAllFile.exportMapping);
     }
     
     handleImportDeclaration(node) {
-        if (AST.isSpecialImportCases(node)) return false;
+        if (SkippingCases.isOneOfSkippingImportCases(node)) return false;
         if (AST.isAnySpecifierExist(node.specifiers)) {
           const importPath = node.source.value;
-          const resolvedPath = resolver.resolve(importPath, this.path).absEsmFile;
+          const resolver = ResolverFactory.lastCreatedInstance;
+          const resolvedPath = resolver.resolve(importPath, this.path);
+          if (!resolvedPath) return;
+          const normalizedResolvedPath = PathFunctions.normalizeModulePath(resolvedPath);
           node.specifiers.forEach((specifier) => {
               // import {abc, def} from './abc';
               const specifierObj = SpecifierFactory.createSpecifier("import");
               specifierObj.importedName = specifier?.imported?.name || "default";
               specifierObj.localName = specifier.local.name;
-              specifierObj.type = AST.getSpecifierType(specifier);
-              specifierObj.esmPath = resolvedPath;
+              specifierObj.type = AST.getImportSpecifierType(specifier);
+              specifierObj.esmPath = normalizedResolvedPath;
               const { localName } = specifierObj;
               this.importMapping[localName] = specifierObj;
           });  
@@ -289,12 +291,11 @@ class BarrelFile {
     }    
 
     getDeepestDirectSpecifierObject(specifierObj) {
-        const { esmPath, localName } = specifierObj;
-        if (BarrelFile.isBarrelFilename(esmPath) && esmPath !== this.path) {
-          if (this.resolvedPathObject?.packageJsonExports) return specifierObj;
-          const resolvedPathObject = resolver.resolve(esmPath ,this.path);
-          if (resolvedPathObject.packageJsonExports) return specifierObj;
-          const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);        
+        const { absEsmPath, localName } = specifierObj;
+        if (BarrelFile.isBarrelFilename(absEsmPath) && absEsmPath !== this.path) {
+          const resolver = ResolverFactory.lastCreatedInstance;
+          const resolvedPathObject = resolver.resolve(absEsmPath ,this.path);
+          const barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject);        
           if (barrelFile.isBarrelFileContent) {
             const deepestSpecifier = Object.assign(new ExportSpecifier(), {...barrelFile.getDirectSpecifierObject(localName)});
             deepestSpecifier.exportedName = specifierObj.exportedName;
@@ -305,17 +306,19 @@ class BarrelFile {
     }
 
     getDirectSpecifierObject(specifierExportedName) {
-      return this.exportMapping[specifierExportedName] ?
-          this.exportMapping[specifierExportedName] : 
-          (this.defaultPatternExport.isDefaultPatternCreated && this.defaultPatternExport.getSpecifier(specifierExportedName));
+      if (this.exportMapping[specifierExportedName]) {
+        return this.exportMapping[specifierExportedName];
+      }
+      if (this.defaultPatternExport.isDefaultPatternCreated) {
+        return this.defaultPatternExport.getSpecifier(specifierExportedName);
+      }
     }    
 }
 
 class BarrelFilesPackage {
-    constructor(packageObj, cache) {
+    constructor(packageObj) {
       this.packageObj = packageObj;
-      this.cache = cache;
-      this.barrelFiles = this.cache?.data || new Map();
+      this.barrelFiles = new Map();
     }
 
     getBarrelFile(path) {
@@ -332,81 +335,151 @@ class BarrelFilesPackage {
     }
 }
 
-class BarrelFilesPackageCacheStrategy {
-  customizedParsingMethod(cacheData) {
+class BarrelFilesPackagesManager {
+  constructor() {
+      this.barrelFilesByPackage = new Map();
+  }
+
+  isPackageExist(packageName) {
+    return this.barrelFilesByPackage.has(packageName);
+  }
+
+  getPackage(packageName) {
+    return this.barrelFilesByPackage.get(packageName);
+  }
+
+  getBarrelFilesPackage(path) {
+    const packageName = Package.getMainPackageNameFromPath(path);
+    if (!this.isPackageExist(packageName)) {
+      const packageObj = packageManager.getMainPackageOfModule(path);
+      const barrelFilesPackage = new BarrelFilesPackage(packageObj);
+      this.barrelFilesByPackage.set(packageName, barrelFilesPackage);
+      return barrelFilesPackage;
+    } else {
+      const barrelFilesPackage = this.getPackage(packageName);
+      return barrelFilesPackage;
+    }
+  }
+
+  dispose() {
+    this.barrelFilesByPackage.clear();
+  }
+}
+
+class BarrelFilesPackageSerializer {
+  #convertMapToObject(mapInstance) {
+    return Object.fromEntries(mapInstance);
+  }
+
+  #convertNativeObjectToBarrelFileObject(value) {
+    return Object.assign(new BarrelFile(), value);
+  }
+
+  #convertNativeObjectToExportSpecifierObjectMapping(value) {
+    const exportMapping = {};
+    for (const [exportMappingKey, exportMappingValue] of Object.entries(value)) {
+      exportMapping[exportMappingKey] = Object.assign(SpecifierFactory.createSpecifier("export"), exportMappingValue);
+    }
+    return exportMapping;
+  }
+
+  #convertNativeObjectToDefaultPatternExportObject(value) {
+    return Object.assign(new DefaultPatternExport(), value);
+  }
+
+  #parseBarrelFiles(stringData) {
     const barrelFiles = new Map();
-    for (const [key, value] of Object.entries(cacheData)) {
-      const barrelFile = Object.assign(new BarrelFile(), value);
-      for (const [exportMappingKey, exportMappingValue] of Object.entries(value.exportMapping)) {
-        barrelFile.exportMapping[exportMappingKey] = Object.assign(SpecifierFactory.createSpecifier("export"), exportMappingValue);
-      }
-      barrelFile.defaultPatternExport = Object.assign(new DefaultPatternExport(), value.defaultPatternExport);
-      barrelFiles.set(key, barrelFile);
+    const barrelFilesObj = JSON.parse(stringData);
+    for (const [barrelFilePath, barrelFileObj] of Object.entries(barrelFilesObj)) {
+      const barrelFile = this.#convertNativeObjectToBarrelFileObject(barrelFileObj);
+      barrelFile.exportMapping = this.#convertNativeObjectToExportSpecifierObjectMapping(barrelFileObj.exportMapping);
+      barrelFile.defaultPatternExport = this.#convertNativeObjectToDefaultPatternExportObject(barrelFileObj.defaultPatternExport);
+      barrelFiles.set(barrelFilePath, barrelFile);
     }
     return barrelFiles;
   }
-}
 
-class BarrelFilesPackageCacheFacade {
-  static getCachePackageFileName(packageName) {
-    if (PathFunctions.isNodeModule(packageName)) {
-      return `${packageName}.json`.replace("\\","_");
-    } else {
-      return `local.json`;
-    }
-  }  
+  serialize(data) {
+    const obj = (data instanceof Map) ? this.#convertMapToObject(data) : data;
+    const raw = JSON.stringify(obj, null, 2);
+    return raw;
+  }
 
-  static createCache(packageObj) {
-    const { isCacheEnabled } = pluginOptions.options;
-    if (!isCacheEnabled || !PathFunctions.isNodeModule(packageObj.path)) return;
-    const cacheFileName = BarrelFilesPackageCacheFacade.getCachePackageFileName(packageObj.name);
-    const packagesVersionsFileName = 'packagesVersions.json'
-    const cacheFolderName = "babel-plugin-transform-barrels_cache"
-    const cache = new Cache(cacheFileName, cacheFolderName, packagesVersionsFileName, packageObj.name, packageObj.version, new BarrelFilesPackageCacheStrategy());
-    if (cache.isCacheUpdated) {
-      cache.loadCacheData();  
-    }
-    return cache;
+  deserialize(raw) {
+    const data = this.#parseBarrelFiles(raw);
+    return data;
   }
 }
 
-
-class BarrelFilesPackagesManager {
-  constructor() {
-    this.barrelFilesByPackage = new Map();
+class BarrelFilesPackagesManagerCacheProxy {
+  constructor(realService) {
+    this.cacheFolderName = "babel-plugin-transform-barrels_cache";
+    this.realService = realService;
   }
 
-  getBarrelFileManager(path) {
-    const moduleDir = ospath.dirname(path)
-    const mainPackagePath = Package.getHighestParentPackageDir(moduleDir);
-    const packageName = PathFunctions.normalizeModulePath(mainPackagePath);
-    let barrelFilesPackage;
-    if (!this.barrelFilesByPackage.has(packageName)) {
-      const packageObj = packageManager.getMainPackageOfModule(path);
-      const cache = BarrelFilesPackageCacheFacade.createCache(packageObj);
-      barrelFilesPackage = new BarrelFilesPackage(packageObj, cache);
-      this.barrelFilesByPackage.set(packageName, barrelFilesPackage);
+  get barrelFilesByPackage() {
+    return this.realService.barrelFilesByPackage;
+  }
+
+  getBarrelFilesPackage(path) {
+    const packageName = Package.getMainPackageNameFromPath(path);
+    if (PathFunctions.isNodeModule(packageName) && !this.realService.isPackageExist(packageName)) {
+      const barrelFilesPackage = this.realService.getBarrelFilesPackage(path);
+      const currentPackageVersion = barrelFilesPackage.packageObj.version;
+      const packageCache = FileCacheFactory.createPackageCache(packageName, this.cacheFolderName, new BarrelFilesPackageSerializer());
+      if (packageCache.isCacheUpdated(currentPackageVersion)) {
+        barrelFilesPackage.barrelFiles = packageCache.readCache();
+      }
+      return barrelFilesPackage;        
     }
-    barrelFilesPackage = this.barrelFilesByPackage.get(packageName);
-    return barrelFilesPackage;
+    return this.realService.getBarrelFilesPackage(path);
+  }
+
+  saveToCacheAllPackagesBarrelFiles() {
+    const { barrelFilesByPackage } = BarrelFileManagerFacade.barrelFilesPackagesManager;
+    let index = 0;
+    const lastIndex = barrelFilesByPackage.size - 1;
+    barrelFilesByPackage.forEach((barrelFilesPackage)=>{
+      const packageName = barrelFilesPackage.packageObj.name;
+      const currentPackageVersion = barrelFilesPackage.packageObj.version;
+      const packageCache = FileCacheFactory.createPackageCache(packageName, this.cacheFolderName, new BarrelFilesPackageSerializer());
+      if (barrelFilesPackage.packageObj.isNodeModule && !packageCache.isCacheUpdated(currentPackageVersion)) {
+        const isLastIteration = index === lastIndex;
+        packageCache.saveCache(barrelFilesPackage.barrelFiles, currentPackageVersion, isLastIteration);
+      }
+      index++;
+    })
+  }
+
+  dispose() {
+    this.saveToCacheAllPackagesBarrelFiles();
+    this.realService.dispose();
   }
 }
 
 class BarrelFileManagerFacade {
+  static #barrelFilesPackagesManager;
+
+  static get barrelFilesPackagesManager() {
+    if (!BarrelFileManagerFacade.#barrelFilesPackagesManager) {
+      BarrelFileManagerFacade.#barrelFilesPackagesManager = new BarrelFilesPackagesManager();
+      if (pluginOptions.options.isCacheEnabled) {
+        BarrelFileManagerFacade.#barrelFilesPackagesManager = new BarrelFilesPackagesManagerCacheProxy(BarrelFileManagerFacade.#barrelFilesPackagesManager);
+      }    
+    }
+
+    return BarrelFileManagerFacade.#barrelFilesPackagesManager;
+  }
+
   static getBarrelFile(path) {
     if (!BarrelFile.isBarrelFilename(path)) return new BarrelFile();
-    const barrelFilesPackage = barrelFilesPackagesManager.getBarrelFileManager(path);
+    const barrelFilesPackage = BarrelFileManagerFacade.barrelFilesPackagesManager.getBarrelFilesPackage(path);
     const barrelFile = barrelFilesPackage.getBarrelFile(path);
     return barrelFile;
   }
 
-  static saveToCacheAllPackagesBarrelFiles() {
-    const { isCacheEnabled } = pluginOptions.options;
-    barrelFilesPackagesManager.barrelFilesByPackage.forEach((barrelFilesPackage)=>{
-      if (isCacheEnabled && PathFunctions.isNodeModule(barrelFilesPackage.packageObj.path) && !barrelFilesPackage.cache.isCacheUpdated) {
-        barrelFilesPackage.cache.saveCache(barrelFilesPackage.barrelFiles);
-      }
-    })
+  static dispose() {
+    BarrelFileManagerFacade.barrelFilesPackagesManager.dispose();
   }
 }
 
@@ -430,35 +503,44 @@ class Specifier {
       this.localName = "";
   }
 
+  get #fromPath() {
+    return ospath.resolve("file.js");
+  }
+
   get absEsmPath() {
-    const from = PathFunctions.isNodeModule(this.esmPath) ? ospath.dirname(resolver.from) : process.cwd();
-    return PathFunctions.getAbsolutePath(this.esmPath, from, resolver.modulesDirs);
+    const resolver = ResolverFactory.lastCreatedInstance;
+    return resolver.resolve(this.esmPath, this.#fromPath);
   }
 
   get cjsPath() {
-    const packageObj = packageManager.getMainPackageOfModule(this.absEsmPath);
-    if (packageObj.name === this.esmPath) return this.esmPath;
-    const replacedPath = packageObj.convertESMToCJSPath(this.esmPath);
-    const from = PathFunctions.isNodeModule(replacedPath) ? ospath.dirname(resolver.from) : process.cwd();
-    const absReplacedPath = PathFunctions.getAbsolutePath(replacedPath, from, resolver.modulesDirs);
-    if (!absReplacedPath) return null;
-    return replacedPath;
+    if (!this.absCjsPath) return null;
+    return PathFunctions.normalizeModulePath(this.absCjsPath);
   }
 
   get absCjsPath() {
-    const from = PathFunctions.isNodeModule(this.esmPath) ? ospath.dirname(resolver.from) : process.cwd();
-    return PathFunctions.getAbsolutePath(this.cjsPath, from, resolver.modulesDirs);
+    try {
+      const resolver = ResolverFactory.lastCreatedInstance;
+      const packageObj = packageManager.getMainPackageOfModule(this.absEsmPath);
+      const packageDualModuleObj = new PackageDualModule(packageObj);
+      const convertedCjsPath = packageDualModuleObj.convertESMToCJSPath(this.esmPath);
+      const absConvertedCjsPath = resolver.resolve(convertedCjsPath, this.#fromPath, "commonjs");
+      return absConvertedCjsPath;  
+    } catch (err) {
+      return null;
+    }
   }
 
   get path() {
     if (!PathFunctions.isNodeModule(this.esmPath)) {
       return this.absEsmPath;
     } else {
-      const packageObj = packageManager.getNearestPackageJsonContent(resolver.from);
+      const packageManager = new PackageManager();
+      const localPackageJson = ospath.resolve('package.json');
+      const packageObj = packageManager.getPackageJSON(localPackageJson);
       if (packageObj?.type === "module") {
-        return this.esmPath;
+        return this.absEsmPath;
       } else {
-        return this.cjsPath;
+        return this.absCjsPath;
       }
     }
   }
@@ -474,9 +556,6 @@ class ExportSpecifier extends Specifier {
         const specifierObj = SpecifierFactory.createSpecifier("import");
         specifierObj.type = this.type;
         specifierObj.esmPath = this.esmPath;
-        if (!PathFunctions.isNodeModule(specifierObj.esmPath)) {
-          specifierObj.esmPath = ospath.join(process.cwd(), specifierObj.esmPath);
-        }
         specifierObj.importedName = this.localName;
         return specifierObj;
     }
@@ -496,7 +575,5 @@ class ImportSpecifier extends Specifier {
         return specifierObj;
     }
 }
-
-const barrelFilesPackagesManager = new BarrelFilesPackagesManager();
 
 module.exports = BarrelFileManagerFacade;

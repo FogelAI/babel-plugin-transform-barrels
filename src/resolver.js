@@ -1,155 +1,103 @@
 const ospath = require("path");
-const PathFunctions = require("./path");
-const { packageManager } = require("./packages");
+const fg = require("fast-glob");
+const { PathFunctions, TypesFunctions } = require("./utils");
+const { BuildInFileSystem: FileSystem } = require('./buildInFileSystem');
+const { PackageManager, PackageDualModule } = require("./packages");
 
-let instance;
-const defaultModulesDirs = ["node_modules"];
-const defaultExtensions = ["", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"];
-const nodeModulesFolder = {};
+const fileSystem = new FileSystem(PathFunctions);
 
 class Resolver {
-    constructor() {
+    static nodeModulesFolder = {};
+    static defaultModuleDirs = ["node_modules"];
+    static defaultExtensions = ["", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"];
+
+    constructor(executorStrategy) {
         this.resetDefaults();
-        if (instance) {
-          throw new Error("You can only create one instance!");
-        }
-        instance = this;  
+        this.executorStrategy = executorStrategy;
     }
 
     resetDefaults() {
       this.aliasObj = {};
       this.from = "";
-      this.modulesDirs = defaultModulesDirs;
+      this.moduleDirs = [...Resolver.defaultModuleDirs];
       this.absModuleDirs = [];
-      this.extensions = defaultExtensions;
+      this.extensions = [...Resolver.defaultExtensions];
+    }
+
+    appendAlias(alias) {
+      this.aliasObj = { ...this.aliasObj, ...alias };
+    }
+
+    setAlias(alias) {
+      this.aliasObj = alias;
     }
 
     setExtensions(extensions) {
-      this.extensions = extensions;
-      this.extensions.unshift("");
+      this.extensions = [...new Set(["", ...extensions])];
     }
 
-    setModulesDirs(modulesDirs) {
-      this.modulesDirs = [];
+    setModuleDirs(moduleDirs) {
+      this.moduleDirs = [];
       this.absModuleDirs = [];
-      for (const moduleDir of modulesDirs) {
+      for (const moduleDir of moduleDirs) {
         if (ospath.isAbsolute(moduleDir)) {
           this.absModuleDirs.push(moduleDir);
         } else {
-          this.modulesDirs.push(moduleDir);
+          this.moduleDirs.push(moduleDir);
         }
       }
     }
 
-    resolve(path, from) {
+    loadWorkspacesAlias() {
+      const workspacesAlias = this.#getConvertionOfWorkspacesToAlias();
+      workspacesAlias && this.appendAlias(workspacesAlias);
+    }
+
+    loadAlias(alias) {
+      if (this.executorStrategy) {
+        const preparedAlias = this.executorStrategy.prepareAlias(alias);
+        this.appendAlias(preparedAlias);
+      }
+    }
+
+    loadExtensions(extensions) {
+      if (this.executorStrategy) {
+        const preparedExtensions = this.executorStrategy.prepareExtensions(extensions);
+        this.setExtensions(preparedExtensions);  
+      }
+    }  
+
+    loadModuleDirs(moduleDirs) {
+      this.setModuleDirs(moduleDirs);
+    }
+
+    #getConvertionOfWorkspacesToAlias() {
+      const packageManager = new PackageManager();
+      const localPackageJson = ospath.resolve('package.json');
+      const packageObj = packageManager.getPackageJSON(localPackageJson);
+      if (packageObj.workspaces) {
+        const workspaces = new PackageJsonWorkspaces(packageObj);
+        workspaces.load();  
+        return workspaces.getAlias();
+      }
+    }
+
+    resolve(path, from, moduleType="module") {
+        if (this.executorStrategy?.hasSpecialCharInImportPath?.(path)) {
+          throw new ResolveError(`The ${path} path from the ${from} file is ignored from resolving because has special character`, ResolveError.subErrors.has_special_character ,path, {...this});
+        }
+        this.from = from;
         let resolvedPath;
         const fromDir = ospath.dirname(from);
         const originalPath = PathFunctions.isRegularPath(path) ? path : this.convertAliasToOriginal(path);
-        resolvedPath = this.resolveRegularPaths(originalPath, fromDir);
+        resolvedPath = this.#resolveRegularPaths(originalPath, fromDir, moduleType);
         if (resolvedPath) return resolvedPath;
-        resolvedPath = this.resolveNodeModules(originalPath, fromDir);
+        resolvedPath = this.#resolveNodeModules(originalPath, fromDir, moduleType);
         if (resolvedPath) return resolvedPath;
-        resolvedPath = this.resolveAbsoluteModuleDirs(originalPath, fromDir);
-        if (resolvedPath) return resolvedPath;
-        throw new ResolveError(`Unable to resolve the ${path} path from the ${from} file`, path, {...this});
+        resolvedPath = this.#resolveAbsoluteModuleDirs(originalPath, moduleType);
+        if (resolvedPath) return resolvedPath;  
+        throw new ResolveError(`Unable to resolve the ${path} path from the ${from} file`, ResolveError.subErrors.not_found ,path, {...this});
     }    
-
-    resolveRegularPaths(path, fromDir) {
-      let fixedPath = path;
-      if (PathFunctions.isRelativePath(path)) {
-        fixedPath = ospath.join(fromDir, path);
-      }
-      if (ospath.isAbsolute(fixedPath)) {
-        return this.resolveAbsFilePath(fixedPath, fromDir);
-      }
-    }
-
-    resolveAbsoluteModuleDirs(absPath, fromDir) {
-      for (const absModuleDir of this.absModuleDirs) {
-        const path = ospath.join(absModuleDir, absPath);
-        const resolvedPath = this.resolveAbsFilePath(path, fromDir);
-        if (resolvedPath) return resolvedPath;
-      }
-    }
-
-    resolveNodeModules(path, fromDir=process.cwd()) {
-      let currentDir = fromDir;
-      let mainPackage = path.split("/")[0];
-      if (nodeModulesFolder[mainPackage] !== undefined) {
-          if (nodeModulesFolder[mainPackage] === null) {
-              return null;
-          } else {
-              const absPath = ospath.join(nodeModulesFolder[mainPackage], path);
-              return this.resolveAbsFilePath(absPath, fromDir);
-          }
-      }
-      while (currentDir) {
-          if (currentDir.endsWith("node_modules")) {
-              currentDir = PathFunctions.removeLastSegment(currentDir);
-              continue;
-          }
-          for (const modulesDir of this.modulesDirs) {
-            const nodeModulesPath = ospath.join(currentDir, modulesDir);
-            const absPath = ospath.join(nodeModulesPath, path);
-            const resolvedPath = this.resolveAbsFilePath(absPath, fromDir);
-            if (resolvedPath) {
-                nodeModulesFolder[mainPackage] = nodeModulesPath;
-                return resolvedPath;
-            }
-          }
-          currentDir = PathFunctions.removeLastSegment(currentDir);  
-        }
-      nodeModulesFolder[mainPackage] = null;
-      return null;
-    }
-
-    resolveAbsFilePath(absolutePath, fromDir) {
-      const filePath = this.getFilePathWithExtension(absolutePath);
-      if (filePath) {
-        const resolvedDualPath = ResolvedPath.createDualResolvedPath(filePath, fromDir, absolutePath);
-        return resolvedDualPath;
-      }
-      const normalizedModulePath = PathFunctions.normalizeModulePath(absolutePath)
-      const entryPath = this.getFilePathFromPackageJson(absolutePath, normalizedModulePath);
-      if (entryPath) return entryPath;
-      const indexPath = this.getIndexFilePath(absolutePath);
-      if (indexPath) {
-        const resolvedDualPath = ResolvedPath.createDualResolvedPath(indexPath, fromDir, absolutePath);
-        return resolvedDualPath;
-      };
-    }
-
-    getFilePathWithExtension(path) {
-      const ext = this.extensions.find((ext)=> PathFunctions.fileExists(path + ext));
-      if (ext === undefined) return null;
-      const resolvedPath = path + ext;
-      return resolvedPath;
-    }  
-
-    getFilePathFromPackageJson(path, importPath) {
-      const packageFilename = "package.json";
-      const packagePath = ospath.join(path, packageFilename);
-      if (PathFunctions.fileExists(packagePath)) {
-          const packageObj = packageManager.getPackageJSON(packagePath);
-          const { main, type, module } = packageObj;
-          const exportsObj = packageObj.resolveExports(importPath);
-          const cjsModule = exportsObj?.absCjsFile || (type !== "module" && main);
-          const esmModule = exportsObj?.absEsmFile || (type === "module" ? main : module);
-          const absCjsModule = cjsModule && ospath.join(path, cjsModule);
-          const absEsmModule = esmModule && ospath.join(path, esmModule);
-          const absCjsModuleWithExt = absCjsModule ? this.getFilePathWithExtension(absCjsModule) : "";
-          const absEsmModuleWithExt = absEsmModule ? this.getFilePathWithExtension(absEsmModule) : "";
-          const packageJsonExports = !!exportsObj;
-          const resolvedPath = new ResolvedPath(importPath, absEsmModuleWithExt, absCjsModuleWithExt, packageJsonExports);
-          return resolvedPath;
-      }
-    }  
-
-    getIndexFilePath(path) {
-      let indexFilePath = ospath.join(path, "index");
-      indexFilePath = this.getFilePathWithExtension(indexFilePath);
-      return indexFilePath;
-    }  
 
     convertAliasToOriginal(path) {
       const { aliasObj } = this;
@@ -170,82 +118,309 @@ class Resolver {
         }
       }
       return path;
-    }    
-
-    appendAlias(alias) {
-        this.aliasObj = { ...this.aliasObj, ...alias };
     }
-}
 
-class ResolvedPath {
-  static isExtensionFile(path, ext) {
-    const extFilePathRegex = new RegExp(`\.(${ext})$`);
-    return extFilePathRegex.test(path.toLowerCase());  
-  }
-
-  static getTargetPathType(target, from) {
-    if (ResolvedPath.isExtensionFile(target, "cjs") || (!PathFunctions.isNodeModule(from) && PathFunctions.isNodeModule(target) && !ResolvedPath.isExtensionFile(target, "mjs"))) {
-      return "CJS";
-    } else {
-      return "ESM";
+    #resolveRegularPaths(path, fromDir, moduleType) {
+      let fixedPath = path;
+      if (PathFunctions.isRelativePath(path)) {
+        fixedPath = ospath.join(fromDir, path);
+      }
+      if (ospath.isAbsolute(fixedPath)) {
+        return this.#resolveAbsFilePath(fixedPath, moduleType);
+      }
     }
-  }
 
-  static createDualResolvedPath(filePath, from, absolutePath) {
-    const resolvedDualPath = new ResolvedPath();
-    if (ResolvedPath.getTargetPathType(filePath, from) === "ESM") {
-      resolvedDualPath.absEsmFile = filePath;
-    } else {
-      resolvedDualPath.absCjsFile = filePath;
+    #resolveNodeModules(path, fromDir=process.cwd(), moduleType) {
+      let currentDir = fromDir;
+      let mainPackage = path.split("/")[0];
+      if (Resolver.nodeModulesFolder[mainPackage] !== undefined) {
+          if (Resolver.nodeModulesFolder[mainPackage] === null) {
+              return null;
+          } else {
+              const absPath = ospath.join(Resolver.nodeModulesFolder[mainPackage], path);
+              return this.#resolveAbsFilePath(absPath, moduleType);
+          }
+      }
+      while (currentDir) {
+          if (currentDir.endsWith("node_modules")) {
+              currentDir = PathFunctions.removeLastSegment(currentDir);
+              continue;
+          }
+          for (const moduleDir of this.moduleDirs) {
+            const nodeModulesPath = ospath.join(currentDir, moduleDir);
+            const absPath = ospath.join(nodeModulesPath, path);
+            const resolvedPath = this.#resolveAbsFilePath(absPath, moduleType);
+            if (resolvedPath) {
+                Resolver.nodeModulesFolder[mainPackage] = nodeModulesPath;
+                return resolvedPath;
+            }
+          }
+          currentDir = PathFunctions.removeLastSegment(currentDir);  
+      }
+      Resolver.nodeModulesFolder[mainPackage] = null;
+      return null;
     }
-    resolvedDualPath.originalPath = PathFunctions.normalizeModulePath(absolutePath);
-    return resolvedDualPath;
-  }
 
-  constructor(originalPath, absEsmFile, absCjsFile, packageJsonExports) {
-    this.originalPath = originalPath || "";
-    this.absEsmFile = absEsmFile || "";
-    this.absCjsFile = absCjsFile || "";
-    this.packageJsonExports = packageJsonExports || false;
-  }
+    #resolveAbsoluteModuleDirs(absPath, moduleType) {
+      for (const absModuleDir of this.absModuleDirs) {
+        const path = ospath.join(absModuleDir, absPath);
+        const resolvedPath = this.#resolveAbsFilePath(path, moduleType);
+        if (resolvedPath) return resolvedPath;
+      }
+    }
 
-  get esmFile() {
-    return PathFunctions.normalizeModulePath(this.absEsmFile);
-  }
+    #resolveAbsFilePath(absolutePath, moduleType) {
+      const filePath = this.getFilePathWithExtension(absolutePath);
+      if (filePath) return filePath;
+      const entryExportPath = this.#getFilePathFromPackageJsonExports(absolutePath, moduleType);
+      if (entryExportPath) return entryExportPath;
+      const entryPath = this.getFilePathFromPackageJson(absolutePath, moduleType);
+      if (entryPath) return entryPath;
+      const indexPath = this.getIndexFilePath(absolutePath);
+      if (indexPath) return indexPath;
+    }
 
-  get cjsFile() {
-    return PathFunctions.normalizeModulePath(this.absCjsFile);
-  }
+    getFilePathWithExtension(path) {
+      const ext = this.extensions.find((ext)=> fileSystem.fileExists(path + ext));
+      if (ext === undefined) return null;
+      const resolvedPath = path + ext;
+      return resolvedPath;
+    }  
 
-  get absEsmFolder() {
-    return ospath.dirname(this.absEsmFile);
-  }
+    getFilePathFromPackageJson(path, moduleType) {
+      const packageFilename = "package.json";
+      const packagePath = ospath.join(path, packageFilename);
+      if (fileSystem.fileExists(packagePath)) {
+        const packageManager = new PackageManager();
+        const packageObj = packageManager.getPackageJSON(packagePath);
+        const moduleShortPath = PackageDualModule.getPackageEntryByType(packageObj, moduleType);
+        if (!moduleShortPath) {
+          throw new ResolveError(`Unable to resolve from package.json the entry file of module type "${moduleType}" in the ${path} path from the ${this.from} file`, ResolveError.subErrors.entry_file_of_module_type_doesnt_exist ,path, {...this});
+        }
+        if (!moduleShortPath) return null;
+        const absModulePath = ospath.join(path, moduleShortPath);
+        const absModuleWithExt = this.getFilePathWithExtension(absModulePath);
+        return absModuleWithExt;
+      }
+    }
 
-  get absCjsFolder() {
-    return ospath.dirname(this.absCjsFile);
-  }
+    #getFilePathFromPackageJsonExports(path, moduleType) {
+      const packageFilename = "package.json";
+      const packagePath = ospath.join(path, packageFilename);
+      if (fileSystem.fileExists(packagePath)) {
+        const packageManager = new PackageManager();
+        const packageObj = packageManager.getPackageJSON(packagePath);
+        if (!packageObj.exports) return null;
+        const normalizedModulePath = PathFunctions.normalizeModulePath(path);
+        const moduleRelativePath = PackageDualModule.getPackageExportsEntryByType(packageObj, normalizedModulePath, moduleType);
+        if (!moduleRelativePath) return null;
+        const moduleAbsPath = ospath.join(path, moduleRelativePath);
+        return moduleAbsPath;
+      }
+    }
 
-  get isNodeModule() {
-    return (
-      PathFunctions.isNodeModule(this.absEsmFile) || 
-      PathFunctions.isNodeModule(this.absCjsFile)
-    )
-  }
-
-  get isDual() {
-    return (this.absEsmFile && this.absCjsFile);
-  }
+    getIndexFilePath(path) {
+      let indexFilePath = ospath.join(path, "index");
+      indexFilePath = this.getFilePathWithExtension(indexFilePath);
+      return indexFilePath;
+    }
 }
 
 class ResolveError extends Error {
-  constructor(message, path, resolverObj) {
+  constructor(message, subError, path, resolverObj) {
       super(message);
       this.name = 'ResolveError';
+      this.subError = subError;
       this.path = path;
       this.resolverObj = resolverObj;
   }
+
+  static subErrors = {
+    not_found: "not_found_resolved_path",
+    has_special_character: "has_special_character",
+    entry_file_of_module_type_doesnt_exist: "entry_file_of_module_type_in_packagejson_doesnt_exist"
+  }
 }
 
-const singletonResolver = new Resolver();
+class PackageJsonWorkspaces {
+  constructor(packageObj) {
+    this.packageObj = packageObj;
+    this.aliasObj = {};
+  }
 
-module.exports = singletonResolver;
+  load() {
+    this.workspacesToAliases()
+  }
+  
+  getWorkspacesPackageJsons( { startPath = ospath.resolve('.'), workspaces } = {} ) {
+    const globWorkspaces = workspaces.map((ws)=> ws + '/**/package.json');
+    const packagesJsons = fg.sync(
+      globWorkspaces,
+      {
+        deep: Infinity,
+        onlyFiles: true,
+        absolute: true,
+        cwd: startPath,
+        ignore: ['**/node_modules'],
+      },
+    );
+    return packagesJsons;
+  }
+
+  workspacesToAliases() {
+    const { workspaces } = this.packageObj;
+    const packagesJsons = this.getWorkspacesPackageJsons({workspaces});
+    const aliases = packagesJsons.reduce((alias, pkgPath) => {
+      const packageManager = new PackageManager();
+      const packageObj = packageManager.getPackageJSON(pkgPath);
+      const pkgName = packageObj.data.name;  
+      alias[pkgName] = ospath.dirname(pkgPath);
+      return alias;
+    }, {})
+    this.aliasObj = aliases;
+    return aliases;
+  }
+
+  getAlias() {
+    return this.aliasObj;
+  }
+}
+
+class WebpackStrategy {
+  
+  hasSpecialCharInImportPath(importPath) {
+    return (importPath.includes("!") || importPath.includes("?"));
+  }
+
+  prepareExtensions(extensions) {
+      return extensions;
+  }
+
+  prepareAlias(alias) {
+      return this.addPrefixRegexToAliases(alias);
+  }
+
+  addPrefixRegexToAliases(aliasObj) {
+      if (TypesFunctions.isObjectEmpty(aliasObj)) return;
+      const newAliasObj = {};
+      const aliases = Object.keys(aliasObj);
+      for (const alias of aliases) {
+        newAliasObj[`^${alias}((?:[\\/]|$))`] = `${aliasObj[alias]}$1`;
+      }
+      return newAliasObj;  
+  }
+}
+
+class ViteStrategy {
+  hasSpecialCharInImportPath(importPath) {
+    return (importPath.startsWith("/") || importPath.startsWith("virtual:") || importPath.includes("?"));
+  }
+
+  prepareExtensions(extensions) {
+      return extensions;
+  }
+
+  prepareAlias(alias) {
+      return this.addPrefixRegexToAliases(alias);
+  }
+
+  addPrefixRegexToAliases(aliasObj) {
+    if (TypesFunctions.isObjectEmpty(aliasObj)) return;
+    const newAliasObj = {};
+    const aliases = Object.keys(aliasObj);
+    for (const alias of aliases) {
+      newAliasObj[`^${alias}((?:[\\/]|$))`] = `${aliasObj[alias]}$1`;
+    }
+    return newAliasObj;  
+  }
+}
+
+class JestStrategy {
+  prepareExtensions(extensions) {
+      return extensions.map(ext => ext.startsWith(".") ? ext : `.${ext}`);
+  }
+
+  prepareAlias(alias) {
+      return Array.isArray(alias) ? Object.fromEntries(alias) : alias;
+  }
+}
+
+class ResolverFactory {
+  static #lastCreatedInstance;
+
+  static get lastCreatedInstance() {
+    return ResolverFactory.#lastCreatedInstance;
+  }
+
+  static createResolver(type, alias, extensions, moduleDirs) {
+    const executorsMap = {
+      regular: () => new ResolverWithErrorHandlingProxy(new Resolver()),
+      webpack: () => new ResolverWithErrorHandlingProxy(new Resolver(new WebpackStrategy())),
+      vite:    () => new ResolverWithErrorHandlingProxy(new Resolver(new ViteStrategy())),
+      jest:    () => new ResolverWithErrorHandlingProxy(new Resolver(new JestStrategy())),
+      default : () => new Resolver()
+    };
+    const resolver = (executorsMap[type] || executorsMap.default)();
+    resolver.resetDefaults();
+    resolver.loadWorkspacesAlias();
+    resolver.loadAlias(alias || {});
+    resolver.loadExtensions(extensions || Resolver.defaultExtensions);
+    resolver.loadModuleDirs(moduleDirs || Resolver.defaultModuleDirs);
+    ResolverFactory.#lastCreatedInstance = resolver;
+    return resolver;
+  }
+}
+
+class ResolverWithErrorHandlingProxy {
+  constructor(realService) {
+    this.realService = realService;
+  }
+
+  resolve(...args) {
+    try {
+      const resolvedPath = this.realService.resolve(...args);
+      return resolvedPath;
+    } catch(err) {
+      if (err.name === "ResolveError") {
+        if (err.subError === ResolveError.subErrors.entry_file_of_module_type_doesnt_exist) {
+          return null;
+        }
+      }
+      throw err;    
+    }  
+  }
+
+  loadWorkspacesAlias() {
+    return this.realService.loadWorkspacesAlias();
+  }
+
+  appendAlias(...args) {
+    return this.realService.appendAlias(...args);
+  }
+
+  loadAlias(...args) {
+    return this.realService.loadAlias(...args);
+  }
+
+  loadExtensions(...args) {
+    return this.realService.loadExtensions(...args)
+  }
+
+  loadModuleDirs(...args) {
+    return this.realService.loadModuleDirs(...args)
+  }
+
+  get from() {
+    return this.realService.from;
+  }
+
+  set from(value) {
+    this.realService.from = value;
+  }
+
+  resetDefaults() {
+    this.realService.resetDefaults();
+  }
+}
+
+module.exports = { ResolverFactory };

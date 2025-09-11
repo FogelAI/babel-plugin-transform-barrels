@@ -5,7 +5,7 @@ class PluginOptions {
         executorName: "other",
         alias: {},
         extensions: [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"],
-        modulesDirs: ["node_modules"],
+        moduleDirs: ["node_modules"],
         moduleIgnorePatterns: [],
         isCacheEnabled: false,
         logging: {
@@ -15,7 +15,7 @@ class PluginOptions {
     };
 
     constructor() {
-        this.options = PluginOptions.defaultOptions;
+        this.options = {...PluginOptions.defaultOptions};
         if (instance) {
           throw new Error("You can only create one instance!");
         }

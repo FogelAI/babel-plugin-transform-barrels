@@ -81,10 +81,10 @@ describe("jest mock", () => {
             pluginOptions
           )
         ).toBe([
-          `jest.mock(\"@mui\\material\\node\\Accordion\\Accordion.js", () => ({`,
+          `jest.mock(\"${process.cwd()}\\node_modules\\@mui\\material\\node\\Accordion\\Accordion.js", () => ({`,
           `  default: jest.fn()`,
           `}));`,
-          `jest.mock(\"@mui\\material\\node\\Alert\\Alert.js", () => ({`,
+          `jest.mock(\"${process.cwd()}\\node_modules\\@mui\\material\\node\\Alert\\Alert.js", () => ({`,
           `  default: jest.fn()`,
           `}));`,
         ].join("\n").replaceAll("\\","\\\\"));
@@ -102,16 +102,16 @@ describe("jest mock", () => {
             pluginOptions
           )
         ).toBe([
-          `jest.mock(\"@react-native-google-signin\\google-signin\\lib\\commonjs\\errors\\errorCodes.js", () => ({`,
+          `jest.mock(\"${process.cwd()}\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\errors\\errorCodes.js", () => ({`,
           `  statusCode: 'SUCCESS'`,
           `}));`,
-          `jest.mock(\"@react-native-google-signin\\google-signin\\lib\\commonjs\\buttons\\GoogleSigninButton.js", () => ({`,
+          `jest.mock(\"${process.cwd()}\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\buttons\\GoogleSigninButton.js", () => ({`,
           `  statusCode: 'SUCCESS'`,
           `}));`,
-          `jest.mock(\"@react-native-google-signin\\google-signin\\lib\\commonjs\\functions.js", () => ({`,
+          `jest.mock(\"${process.cwd()}\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\functions.js", () => ({`,
           `  statusCode: 'SUCCESS'`,
           `}));`,
-          `jest.mock(\"@react-native-google-signin\\google-signin\\lib\\commonjs\\signIn\\GoogleSignin.js", () => ({`,
+          `jest.mock(\"${process.cwd()}\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\signIn\\GoogleSignin.js", () => ({`,
           `  statusCode: 'SUCCESS'`,
           `}));`,
         ].join("\n").replaceAll("\\","\\\\"));

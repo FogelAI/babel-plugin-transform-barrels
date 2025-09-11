@@ -189,10 +189,10 @@ describe("logs", () => {
   });
 });
 
-describe("modules directories", () => {
-  test("resolve modules directories - relative path", () => {
-    const modulesDirs = ["node_modules", "components"];
-    const pluginOptions = { executorName: "webpack", modulesDirs: modulesDirs };
+describe("module directories", () => {
+  test("resolve module directories - relative path", () => {
+    const moduleDirs = ["node_modules", "components"];
+    const pluginOptions = { executorName: "webpack", moduleDirs: moduleDirs };
     expect(
       pluginTransform(
         'import { RedText as NamedExported } from "Texts";',
@@ -202,9 +202,9 @@ describe("modules directories", () => {
     ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
   });
 
-  test("resolve modules directories - absolute path", () => {
-    const modulesDirs = [ospath.resolve(__dirname, 'components'), 'node_modules'];
-    const pluginOptions = { executorName: "webpack", modulesDirs: modulesDirs };
+  test("resolve module directories - absolute path", () => {
+    const moduleDirs = [ospath.resolve(__dirname, 'components'), 'node_modules'];
+    const pluginOptions = { executorName: "webpack", moduleDirs: moduleDirs };
     expect(
       pluginTransform(
         'import { RedText as NamedExported } from "Texts";',
@@ -215,8 +215,8 @@ describe("modules directories", () => {
   });
 
   test("resolve module file - absolute path", () => {
-    const modulesDirs = [ospath.resolve(__dirname), 'node_modules'];
-    const pluginOptions = { executorName: "webpack", modulesDirs: modulesDirs };
+    const moduleDirs = [ospath.resolve(__dirname), 'node_modules'];
+    const pluginOptions = { executorName: "webpack", moduleDirs: moduleDirs };
     expect(
       pluginTransform(
         'import { logger } from "logger";',

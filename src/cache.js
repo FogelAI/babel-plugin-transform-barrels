@@ -1,65 +1,134 @@
-const fs = require("fs");
-const ospath = require("path");
-const PathFunctions = require("./path");
+const { PathFunctions } = require('./utils');
+const { BuildInFileSystem: FileSystem, SerializedFile } = require('./buildInFileSystem');
+const { JsonSerializer } = require('./serializers');
 
-class Cache {
-    constructor(cacheFileName, cacheFolderName, cacheMetadataFileName, cacheMetadataKey, cacheMetadataValue, loadCacheStrategy) {
-      this.data;
-      this.cacheFileName = cacheFileName;
-      this.cacheFolderPath = ospath.resolve(cacheFolderName);
-      this.cacheMetadataFilePath = ospath.resolve(this.cacheFolderPath, cacheMetadataFileName);
-      this.cacheMetadataKey = cacheMetadataKey;
-      this.cacheMetadataValue = cacheMetadataValue;
-      this.cacheMetadata = {};
-      this.loadCacheStrategy = loadCacheStrategy;
-      this.loadCacheMetadata();
-    }
+class CachePathResolver {
+  constructor(path) {
+    this.path = path;
+  }
 
-    get isCacheUpdated() {
-        if (!this.cacheMetadataKey) return false;
-        return this.cacheMetadata[this.cacheMetadataKey] === this.cacheMetadataValue;
-    }
+  getCacheFilePath(cacheFileName, cacheFolderName) {
+    const cacheFolderPath = this.path.getFolderPath(cacheFolderName);
+    return this.path.getFilePath(cacheFolderPath, cacheFileName);
+  }
+}
 
-    saveCacheMetadata() {
-        fs.writeFileSync(this.cacheMetadataFilePath, JSON.stringify(this.cacheMetadata, null, 2));
-    }  
-
-    loadCacheMetadata() {
-        if (fs.existsSync(this.cacheMetadataFilePath)) {
-            const cacheContent = fs.readFileSync(this.cacheMetadataFilePath);
-            const cacheData = JSON.parse(cacheContent);
-            this.cacheMetadata = cacheData;
-        }
-    }
-
-    mapToObject(mapInstance) {
-        return Object.fromEntries(mapInstance);
-    }  
-
-    saveCache(data) {
-      const obj = (data instanceof Map) ? this.mapToObject(data) : data;
-      const cacheFolderFilePath = ospath.resolve(this.cacheFolderPath, this.cacheFileName)
-      PathFunctions.createFolderIfNotExists(this.cacheFolderPath);
-      fs.writeFileSync(cacheFolderFilePath, JSON.stringify(obj, null, 2));
-      this.data = data;
-      if (!this.cacheMetadataKey) return;
-      this.cacheMetadata[this.cacheMetadataKey] = this.cacheMetadataValue;
-      this.saveCacheMetadata();
-    }
-
-    customizedParsingMethod(cacheData) {
-        if (!this?.loadCacheStrategy) return cacheData;
-        return this.loadCacheStrategy.customizedParsingMethod(cacheData);
-    }
-    
-    loadCacheData() {
-        const cacheFilePath = ospath.resolve(this.cacheFolderPath, this.cacheFileName);
-        if (fs.existsSync(cacheFilePath)) {
-            const cacheContent = fs.readFileSync(cacheFilePath);
-            const cacheData = this.customizedParsingMethod(JSON.parse(cacheContent));
-            this.data = cacheData;
-        }
+class CachePackagePathResolver extends CachePathResolver {
+  #getCachePackageFileName(packageName) {
+    if (PathFunctions.isNodeModule(packageName)) {
+      return `${packageName}.json`.replace("\\","_");
+    } else {
+      return `local.json`;
     }
   }
-  
-  module.exports = Cache;
+
+  getCachePackageFilePath(packageName, cacheFolderName) {
+    const cachePackageFileName = this.#getCachePackageFileName(packageName);
+    return this.getCacheFilePath(cachePackageFileName, cacheFolderName);
+  }
+}
+
+class PackageCache {
+  constructor(packageName, cacheFolderName, serializedFile) {
+    this.packageName = packageName;
+    this.cacheFolderName = cacheFolderName;
+    this.pathResolver = new CachePackagePathResolver(PathFunctions);
+    this.serializedFile = serializedFile;
+  }
+
+  get cacheFilePath() {
+    return this.pathResolver.getCachePackageFilePath(this.packageName, this.cacheFolderName);
+  }
+
+  isCacheUpdated(currentPackageVersion) {
+    return FileCacheFactory.cachedPackagesVersions.isCacheUpdated(this.packageName, currentPackageVersion);
+  }
+
+  readCache() {
+    const cacheData = this.serializedFile.read(this.cacheFilePath);
+    return cacheData;
+  }
+
+  saveCache(data, currentPackageVersion, saveInAdditionCachedPackagesVersions = true) {
+    this.serializedFile.save(this.cacheFilePath, data);
+    FileCacheFactory.cachedPackagesVersions.setPackageVersion(this.packageName, currentPackageVersion);
+    if (saveInAdditionCachedPackagesVersions) {
+      FileCacheFactory.cachedPackagesVersions.saveCache();
+    }
+  }
+}
+
+class CachedPackagesVersions {
+  static cached;
+
+  constructor(cacheFileName, cacheFolderName, serializedFile) {
+    this.cacheFileName = cacheFileName;
+    this.cacheFolderName = cacheFolderName;
+    this.pathResolver = new CachePathResolver(PathFunctions);
+    this.serializedFile = serializedFile;
+    this.packagesVersions = {};
+  }
+
+  get cacheFilePath() {
+    return this.pathResolver.getCacheFilePath(this.cacheFileName, this.cacheFolderName);
+  }
+
+  getPackageVersion(packageName) {
+    return this.packagesVersions[packageName];
+  }
+
+  setPackageVersion(packageName, newPackageVersion) {
+    this.packagesVersions[packageName] = newPackageVersion;
+  }
+
+  isCacheUpdated(packageName, currentPackageVersion) {
+    return this.getPackageVersion(packageName) === currentPackageVersion;
+  }
+
+  readCache() {
+    const cacheData = this.serializedFile.read(this.cacheFilePath);
+    return cacheData;
+  }
+
+  saveCache() {
+    this.serializedFile.save(this.cacheFilePath, this.packagesVersions);
+  }
+
+  load() {
+    if (!CachedPackagesVersions.cached) {
+      this.packagesVersions = this.readCache() || {};
+      CachedPackagesVersions.cached = this.packagesVersions;
+    } else {
+      this.packagesVersions = CachedPackagesVersions.cached;
+    }
+  }
+}
+
+class FileCacheFactory {
+  static cachedPackagesVersions;
+
+  static #createSerializedFile(serializer) {
+    const fileSystem = new FileSystem(PathFunctions);
+    const serializedFile = new SerializedFile(fileSystem, serializer);
+    return serializedFile;
+  }
+
+  static createPackageCache(packageName, cacheFolderName, serializer) {
+    if (!FileCacheFactory.cachedPackagesVersions) {
+      const packagesVersionsFileName = "packagesVersions.json";
+      FileCacheFactory.cachedPackagesVersions = FileCacheFactory.#createPackageVersionManager(packagesVersionsFileName, cacheFolderName);
+    }
+    const serializedFile = FileCacheFactory.#createSerializedFile(serializer)
+    const packageCache = new PackageCache(packageName, cacheFolderName, serializedFile);
+    return packageCache;
+  }
+
+  static #createPackageVersionManager(cacheFileName, cacheFolderName) {
+    const serializedFile = FileCacheFactory.#createSerializedFile(new JsonSerializer());
+    const serializedCachePackagesVersions = new CachedPackagesVersions(cacheFileName, cacheFolderName, serializedFile);
+    serializedCachePackagesVersions.load()
+    return serializedCachePackagesVersions;
+  }
+}
+
+module.exports = { FileCacheFactory };

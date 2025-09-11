@@ -1,8 +1,8 @@
 const t = require("@babel/types");
 const generate = require('@babel/generator').default;
-const resolver = require("./resolver");
+const { ResolverFactory } = require("./resolver");
 const BarrelFileManagerFacade = require("./barrel");
-const PathFunctions = require("./path");
+const { TypesFunctions } = require("./utils");
 const logger = require("./logger");
 
 class JestMock {
@@ -33,9 +33,9 @@ class JestMock {
 
     loadBarrelFile() {
       const parsedJSFile = this.state.filename;
+      const resolver = ResolverFactory.lastCreatedInstance;
       const resolvedPathObject = resolver.resolve(this.modulePath ,parsedJSFile);
-      if (resolvedPathObject.packageJsonExports) return;
-      this.barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject.absEsmFile);
+      this.barrelFile = BarrelFileManagerFacade.getBarrelFile(resolvedPathObject);
     }
 
     getObjectProperties(path) {
@@ -72,7 +72,7 @@ class JestMock {
         this.barrelImports.map = this.barrelFile.getAllDirectPaths();
       } else if (numOfArguments === 2) {
         this.path.traverse({ ObjectExpression: this.objectExpressionVisitor});
-        if (PathFunctions.isObjectEmpty(this.barrelImports.map)) {
+        if (TypesFunctions.isObjectEmpty(this.barrelImports.map)) {
           this.barrelImports.map = this.barrelFile.getAllDirectPaths();
         }
       }

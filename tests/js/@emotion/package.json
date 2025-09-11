@@ -2,6 +2,7 @@
   "name": "emotion-webpack",
   "version": "1.0.0",
   "main": "bar.js",
+  "type": "module",
   "license": "MIT",
   "devDependencies": {
     "@babel/core": "^7.24.6",
