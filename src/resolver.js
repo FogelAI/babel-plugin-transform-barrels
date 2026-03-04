@@ -313,7 +313,7 @@ class WebpackStrategy {
 
 class ViteStrategy {
   hasSpecialCharInImportPath(importPath) {
-    return (importPath.startsWith("/") || importPath.startsWith("virtual:") || importPath.includes("?"));
+    return (importPath.startsWith("virtual:") || importPath.includes("?"));
   }
 
   prepareExtensions(extensions) {
