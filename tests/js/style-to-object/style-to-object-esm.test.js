@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,7 +25,7 @@ describe("third-party package (style-to-object) transformation for ESM", () => {
           pluginOptions
         )
       ).toBe([
-      `import style from \"${process.cwd()}\\node_modules\\style-to-object\\index.js";`,
+      `import style from \"${process.cwd()}${"\\node_modules\\style-to-object\\index.js".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });

@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,7 +25,7 @@ describe("third-party package (redux-undo) transformation for CommonJS", () => {
           pluginOptions
         )
       ).toBe([
-      `import { ActionCreators } from \"${process.cwd()}\\node_modules\\redux-undo\\dist\\redux-undo.umd.js";`,
+      `import { ActionCreators } from \"${process.cwd()}${"\\node_modules\\redux-undo\\dist\\redux-undo.umd.js".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });

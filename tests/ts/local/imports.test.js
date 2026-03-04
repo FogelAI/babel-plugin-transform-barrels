@@ -12,7 +12,7 @@ describe('typescript transformation', () => {
         pluginOptions
       )
     ).toBe([
-    `import { namedExport } from \"${ospath.resolve(__dirname)}\\components\\namedExport\\namedExport.ts";`,
+    `import { namedExport } from \"${ospath.resolve(__dirname)}${"\\components\\namedExport\\namedExport.ts".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
   
@@ -26,7 +26,7 @@ describe('typescript transformation', () => {
         pluginOptions
       )
     ).toBe([
-    `import { namedExport } from \"${ospath.resolve(__dirname)}\\components\\namedExport\\namedExport.ts";`,
+    `import { namedExport } from \"${ospath.resolve(__dirname)}${"\\components\\namedExport\\namedExport.ts".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
@@ -40,7 +40,7 @@ describe('typescript transformation', () => {
         pluginOptions
       )
     ).toBe([
-    `import defaultExport from \"${ospath.resolve(__dirname)}\\components\\defaultExport\\defaultExport.ts";`,
+    `import defaultExport from \"${ospath.resolve(__dirname)}${"\\components\\defaultExport\\defaultExport.ts".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });  
 });

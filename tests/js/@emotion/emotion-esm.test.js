@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,7 +25,7 @@ describe("third-party package (@emotion/react) transformation for ESM", () => {
         pluginOptions
       )
     ).toBe([
-    `import { css } from \"${process.cwd()}\\node_modules\\@emotion\\react\\dist\\emotion-react.esm.js";`,
+    `import { css } from \"${process.cwd()}${"\\node_modules\\@emotion\\react\\dist\\emotion-react.esm.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
   

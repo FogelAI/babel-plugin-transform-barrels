@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,8 +25,8 @@ describe("third-party package (react-virtualized) transformation for ESM", () =>
           pluginOptions
         )
       ).toBe([
-      `import AutoSizer from \"${process.cwd()}\\node_modules\\react-virtualized\\dist\\es\\AutoSizer\\AutoSizer.js";`,
-      `import List from \"${process.cwd()}\\node_modules\\react-virtualized\\dist\\es\\List\\List.js";`,
+      `import AutoSizer from \"${process.cwd()}${"\\node_modules\\react-virtualized\\dist\\es\\AutoSizer\\AutoSizer.js".split("\\").join(ospath.sep)}";`,
+      `import List from \"${process.cwd()}${"\\node_modules\\react-virtualized\\dist\\es\\List\\List.js".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });

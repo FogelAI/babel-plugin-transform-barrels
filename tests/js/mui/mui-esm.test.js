@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,7 +25,7 @@ describe("third-party package (@mui/icons-material) transformation for ESM", () 
           pluginOptions
         )
       ).toBe([
-      `import ZoomIn from \"${process.cwd()}\\node_modules\\@mui\\icons-material\\esm\\ZoomIn.js";`,
+      `import ZoomIn from \"${process.cwd()}${"\\node_modules\\@mui\\icons-material\\esm\\ZoomIn.js".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 
@@ -37,13 +38,13 @@ describe("third-party package (@mui/icons-material) transformation for ESM", () 
         pluginOptions
       )
     ).toBe([
-    `import CircularProgress from \"${process.cwd()}\\node_modules\\@mui\\material\\CircularProgress\\CircularProgress.js";`,
-    `import Dialog from \"${process.cwd()}\\node_modules\\@mui\\material\\Dialog\\Dialog.js";`,
-    `import DialogContent from \"${process.cwd()}\\node_modules\\@mui\\material\\DialogContent\\DialogContent.js";`,
-    `import List from \"${process.cwd()}\\node_modules\\@mui\\material\\List\\List.js";`,
-    `import ListItem from \"${process.cwd()}\\node_modules\\@mui\\material\\ListItem\\ListItem.js";`,
-    `import ListItemText from \"${process.cwd()}\\node_modules\\@mui\\material\\ListItemText\\ListItemText.js";`,
-    `import Stack from \"${process.cwd()}\\node_modules\\@mui\\material\\Stack\\Stack.js";`,
+    `import CircularProgress from \"${process.cwd()}${"\\node_modules\\@mui\\material\\CircularProgress\\CircularProgress.js".split("\\").join(ospath.sep)}";`,
+    `import Dialog from \"${process.cwd()}${"\\node_modules\\@mui\\material\\Dialog\\Dialog.js".split("\\").join(ospath.sep)}";`,
+    `import DialogContent from \"${process.cwd()}${"\\node_modules\\@mui\\material\\DialogContent\\DialogContent.js".split("\\").join(ospath.sep)}";`,
+    `import List from \"${process.cwd()}${"\\node_modules\\@mui\\material\\List\\List.js".split("\\").join(ospath.sep)}";`,
+    `import ListItem from \"${process.cwd()}${"\\node_modules\\@mui\\material\\ListItem\\ListItem.js".split("\\").join(ospath.sep)}";`,
+    `import ListItemText from \"${process.cwd()}${"\\node_modules\\@mui\\material\\ListItemText\\ListItemText.js".split("\\").join(ospath.sep)}";`,
+    `import Stack from \"${process.cwd()}${"\\node_modules\\@mui\\material\\Stack\\Stack.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 });

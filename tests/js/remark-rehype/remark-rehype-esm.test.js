@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,7 +25,7 @@ describe("third-party package (remark-rehype) transformation for ESM", () => {
           pluginOptions
         )
       ).toBe([
-      `import remarkRehype from \"${process.cwd()}\\node_modules\\remark-rehype\\lib\\index.js";`,
+      `import remarkRehype from \"${process.cwd()}${"\\node_modules\\remark-rehype\\lib\\index.js".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });

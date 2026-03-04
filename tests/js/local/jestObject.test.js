@@ -15,10 +15,10 @@ describe("jest mock", () => {
           pluginOptions
         )
       ).toBe([
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js", () => ({`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}", () => ({`,
         `  RedText: jest.fn()`,
         `}));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js", () => ({`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}", () => ({`,
         `  Text: jest.fn()`,
         `}));`,
       ].join("\n").replaceAll("\\","\\\\"));
@@ -37,12 +37,12 @@ describe("jest mock", () => {
           pluginOptions
         )
       ).toBe([
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js", () => {`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}", () => {`,
         `  return {`,
         `    RedText: jest.fn()`,
         `  };`,
         `});`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js", () => {`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}", () => {`,
         `  return {`,
         `    Text: jest.fn()`,
         `  };`,
@@ -60,11 +60,11 @@ describe("jest mock", () => {
           pluginOptions
         )
       ).toBe([
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js");`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js");`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js");`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js");`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js");`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\YellowText\\YellowText.js".split("\\").join(ospath.sep)}");`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\BlueText\\BlueText.js".split("\\").join(ospath.sep)}");`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\GreenText\\GreenText.js".split("\\").join(ospath.sep)}");`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}");`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}");`,
       ].join("\n").replaceAll("\\","\\\\"));
     });
 
@@ -81,10 +81,10 @@ describe("jest mock", () => {
             pluginOptions
           )
         ).toBe([
-          `jest.mock(\"${process.cwd()}\\node_modules\\@mui\\material\\node\\Accordion\\Accordion.js", () => ({`,
+          `jest.mock(\"${process.cwd()}${"\\node_modules\\@mui\\material\\node\\Accordion\\Accordion.js".split("\\").join(ospath.sep)}", () => ({`,
           `  default: jest.fn()`,
           `}));`,
-          `jest.mock(\"${process.cwd()}\\node_modules\\@mui\\material\\node\\Alert\\Alert.js", () => ({`,
+          `jest.mock(\"${process.cwd()}${"\\node_modules\\@mui\\material\\node\\Alert\\Alert.js".split("\\").join(ospath.sep)}", () => ({`,
           `  default: jest.fn()`,
           `}));`,
         ].join("\n").replaceAll("\\","\\\\"));
@@ -102,16 +102,16 @@ describe("jest mock", () => {
             pluginOptions
           )
         ).toBe([
-          `jest.mock(\"${process.cwd()}\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\errors\\errorCodes.js", () => ({`,
+          `jest.mock(\"${process.cwd()}${"\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\errors\\errorCodes.js".split("\\").join(ospath.sep)}", () => ({`,
           `  statusCode: 'SUCCESS'`,
           `}));`,
-          `jest.mock(\"${process.cwd()}\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\buttons\\GoogleSigninButton.js", () => ({`,
+          `jest.mock(\"${process.cwd()}${"\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\buttons\\GoogleSigninButton.js".split("\\").join(ospath.sep)}", () => ({`,
           `  statusCode: 'SUCCESS'`,
           `}));`,
-          `jest.mock(\"${process.cwd()}\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\functions.js", () => ({`,
+          `jest.mock(\"${process.cwd()}${"\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\functions.js".split("\\").join(ospath.sep)}", () => ({`,
           `  statusCode: 'SUCCESS'`,
           `}));`,
-          `jest.mock(\"${process.cwd()}\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\signIn\\GoogleSignin.js", () => ({`,
+          `jest.mock(\"${process.cwd()}${"\\node_modules\\@react-native-google-signin\\google-signin\\lib\\commonjs\\signIn\\GoogleSignin.js".split("\\").join(ospath.sep)}", () => ({`,
           `  statusCode: 'SUCCESS'`,
           `}));`,
         ].join("\n").replaceAll("\\","\\\\"));
@@ -129,20 +129,20 @@ describe("jest mock", () => {
           pluginOptions
         )
       ).toBe([
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js", () => ({`,
-        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js")`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\YellowText\\YellowText.js".split("\\").join(ospath.sep)}", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\YellowText\\YellowText.js".split("\\").join(ospath.sep)}")`,
         `}));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js", () => ({`,
-        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js")`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\BlueText\\BlueText.js".split("\\").join(ospath.sep)}", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\BlueText\\BlueText.js".split("\\").join(ospath.sep)}")`,
         `}));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js", () => ({`,
-        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js")`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\GreenText\\GreenText.js".split("\\").join(ospath.sep)}", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\GreenText\\GreenText.js".split("\\").join(ospath.sep)}")`,
         `}));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js", () => ({`,
-        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js")`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}")`,
         `}));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js", () => ({`,
-        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js")`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}")`,
         `}));`,
       ].join("\n").replaceAll("\\","\\\\"));
     });
@@ -157,11 +157,11 @@ describe("jest mock", () => {
           pluginOptions
         )
       ).toBe([
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js", () => jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js"));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js", () => jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js"));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js", () => jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js"));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js", () => jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js"));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js", () => jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js"));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\YellowText\\YellowText.js".split("\\").join(ospath.sep)}", () => jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\YellowText\\YellowText.js".split("\\").join(ospath.sep)}"));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\BlueText\\BlueText.js".split("\\").join(ospath.sep)}", () => jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\BlueText\\BlueText.js".split("\\").join(ospath.sep)}"));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\GreenText\\GreenText.js".split("\\").join(ospath.sep)}", () => jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\GreenText\\GreenText.js".split("\\").join(ospath.sep)}"));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}", () => jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}"));`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}", () => jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}"));`,
       ].join("\n").replaceAll("\\","\\\\"));
     });
 
@@ -179,12 +179,12 @@ describe("jest mock", () => {
           pluginOptions
         )
       ).toBe([
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js", () => ({`,
-        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js"),`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}"),`,
         `  RedText: jest.fn()`,
         `}));`,
-        `jest.mock(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js", () => ({`,
-        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js"),`,
+        `jest.mock(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}", () => ({`,
+        `  ...jest.requireActual(\"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}"),`,
         `  Text: jest.fn()`,
         `}));`,
       ].join("\n").replaceAll("\\","\\\\"));

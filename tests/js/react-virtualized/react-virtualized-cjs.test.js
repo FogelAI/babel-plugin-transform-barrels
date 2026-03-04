@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,8 +25,8 @@ describe("third-party package (react-virtualized) transformation for CommonJS", 
           pluginOptions
         )
       ).toBe([
-      `import AutoSizer from \"${process.cwd()}\\node_modules\\react-virtualized\\dist\\commonjs\\AutoSizer\\AutoSizer.js";`,
-      `import List from \"${process.cwd()}\\node_modules\\react-virtualized\\dist\\commonjs\\List\\List.js";`,
+      `import AutoSizer from \"${process.cwd()}${"\\node_modules\\react-virtualized\\dist\\commonjs\\AutoSizer\\AutoSizer.js".split("\\").join(ospath.sep)}";`,
+      `import List from \"${process.cwd()}${"\\node_modules\\react-virtualized\\dist\\commonjs\\List\\List.js".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });

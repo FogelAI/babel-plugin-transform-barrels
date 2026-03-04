@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,7 +25,7 @@ describe("third-party package (fast-json-patch) transformation for ESM", () => {
           pluginOptions
         )
       ).toBe([
-      `import { compare } from \"${process.cwd()}\\node_modules\\fast-json-patch\\module\\duplex.mjs";`,
+      `import { compare } from \"${process.cwd()}${"\\node_modules\\fast-json-patch\\module\\duplex.mjs".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });

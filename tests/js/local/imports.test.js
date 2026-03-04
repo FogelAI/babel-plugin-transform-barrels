@@ -8,7 +8,7 @@ describe("local package transformation", () => {
         'import { RedText as NamedExported } from "./components/Texts";',
         __filename
       )
-    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}";`.replaceAll("\\","\\\\"));
   });
 
   test("transformation of named export that imported from a barrel file that has one line for the import and one line for the export of the same specifier", () => {
@@ -17,7 +17,7 @@ describe("local package transformation", () => {
         'import { ImportedAndExported } from "./components/Texts";',
         __filename
       )
-    ).toBe(`import { YellowText as ImportedAndExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\YellowText\\YellowText.js";`.replaceAll("\\","\\\\"));
+    ).toBe(`import { YellowText as ImportedAndExported } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\YellowText\\YellowText.js".split("\\").join(ospath.sep)}";`.replaceAll("\\","\\\\"));
   });
 
   test("transformation of a default import and a named import re-exporting the entire module namespace", () => {
@@ -27,8 +27,8 @@ describe("local package transformation", () => {
         __filename
       )
     ).toBe([
-    `import { GreenText as GreenTextDefault } from \"${ospath.resolve(__dirname)}\\components\\Texts\\GreenText\\GreenText.js";`,
-    `import * as ImportedAllToNamespace from \"${ospath.resolve(__dirname)}\\components\\Texts\\BlueText\\BlueText.js";`
+    `import { GreenText as GreenTextDefault } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\GreenText\\GreenText.js".split("\\").join(ospath.sep)}";`,
+    `import * as ImportedAllToNamespace from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\BlueText\\BlueText.js".split("\\").join(ospath.sep)}";`
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
@@ -50,7 +50,7 @@ describe("local package transformation", () => {
         __filename
       )
     ).toBe([
-    `import { FirstReexported } from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
+    `import { FirstReexported } from \"${ospath.resolve(__dirname)}${"\\components\\ReexportedAll\\ReexportedAll.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
@@ -61,8 +61,8 @@ describe("local package transformation", () => {
         __filename
       )
     ).toBe([
-    `import { firstKeyVar } from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
-    `import { secondKeyVar } from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
+    `import { firstKeyVar } from \"${ospath.resolve(__dirname)}${"\\components\\ReexportedAll\\ReexportedAll.js".split("\\").join(ospath.sep)}";`,
+    `import { secondKeyVar } from \"${ospath.resolve(__dirname)}${"\\components\\ReexportedAll\\ReexportedAll.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
@@ -73,7 +73,7 @@ describe("local package transformation", () => {
         __filename
       )
     ).toBe([
-    `import { differentName } from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
+    `import { differentName } from \"${ospath.resolve(__dirname)}${"\\components\\ReexportedAll\\ReexportedAll.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
@@ -84,7 +84,7 @@ describe("local package transformation", () => {
         __filename
       )
     ).toBe([
-    `import defaultName from \"${ospath.resolve(__dirname)}\\components\\ReexportedAll\\ReexportedAll.js";`,
+    `import defaultName from \"${ospath.resolve(__dirname)}${"\\components\\ReexportedAll\\ReexportedAll.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 });
@@ -102,7 +102,7 @@ describe("aliases", () => {
         pluginOptions
       )
     ).toBe([
-      `import { Text } from \"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js";`,
+      `import { Text } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
@@ -118,7 +118,7 @@ describe("aliases", () => {
         pluginOptions
       )
     ).toBe([
-      `import { Text } from \"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js";`,
+      `import { Text } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
@@ -134,7 +134,7 @@ describe("aliases", () => {
         pluginOptions
       )
     ).toBe([
-      `import { Text } from \"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js";`,
+      `import { Text } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 
@@ -153,8 +153,8 @@ describe("aliases", () => {
         pluginOptions
       )
     ).toBe([
-      `import { Text } from \"${ospath.resolve(__dirname)}\\components\\Texts\\Text\\Text.js";`,
-      `import { RedText } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`,
+      `import { Text } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\Text\\Text.js".split("\\").join(ospath.sep)}";`,
+      `import { RedText } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}";`,
     ].join("\n").replaceAll("\\","\\\\"));
   });
 });
@@ -171,7 +171,7 @@ describe("logs", () => {
         __filename,
         pluginOptions
       )
-    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}";`.replaceAll("\\","\\\\"));
   });
 
   test("log to file - transformation of named export", () => {
@@ -185,7 +185,7 @@ describe("logs", () => {
         __filename,
         pluginOptions
       )
-    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}";`.replaceAll("\\","\\\\"));
   });
 });
 
@@ -199,7 +199,7 @@ describe("module directories", () => {
         __filename,
         pluginOptions
       )
-    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}";`.replaceAll("\\","\\\\"));
   });
 
   test("resolve module directories - absolute path", () => {
@@ -211,7 +211,7 @@ describe("module directories", () => {
         __filename,
         pluginOptions
       )
-    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}\\components\\Texts\\RedText\\RedText.js";`.replaceAll("\\","\\\\"));
+    ).toBe(`import { RedText as NamedExported } from \"${ospath.resolve(__dirname)}${"\\components\\Texts\\RedText\\RedText.js".split("\\").join(ospath.sep)}";`.replaceAll("\\","\\\\"));
   });
 
   test("resolve module file - absolute path", () => {

@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,8 +25,8 @@ describe("third-party package (date-fns) transformation for ESM", () => {
           pluginOptions
         )
       ).toBe([
-      `import { compareAsc } from \"${process.cwd()}\\node_modules\\date-fns\\compareAsc.js";`,
-      `import { format } from \"${process.cwd()}\\node_modules\\date-fns\\format.js";`,
+      `import { compareAsc } from \"${process.cwd()}${"\\node_modules\\date-fns\\compareAsc.js".split("\\").join(ospath.sep)}";`,
+      `import { format } from \"${process.cwd()}${"\\node_modules\\date-fns\\format.js".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });

@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,7 +25,7 @@ describe("third-party package (graphql) transformation for CommonJS", () => {
           pluginOptions
         )
       ).toBe([
-      `import { graphql } from \"${process.cwd()}\\node_modules\\graphql\\graphql.js";`,
+      `import { graphql } from \"${process.cwd()}${"\\node_modules\\graphql\\graphql.js".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });

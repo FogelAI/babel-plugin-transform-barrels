@@ -1,3 +1,4 @@
+const ospath = require("path");
 const pluginTransform = require("../../pluginTransform");
 const { mockLocalProjectPackageJSON } = require("../jestMockFS");
 
@@ -24,8 +25,8 @@ describe("third-party package (date-fns) transformation for CommonJS", () => {
           pluginOptions
         )
       ).toBe([
-      `import { compareAsc } from \"${process.cwd()}\\node_modules\\date-fns\\compareAsc.cjs";`,
-      `import { format } from \"${process.cwd()}\\node_modules\\date-fns\\format.cjs";`,
+      `import { compareAsc } from \"${process.cwd()}${"\\node_modules\\date-fns\\compareAsc.cjs".split("\\").join(ospath.sep)}";`,
+      `import { format } from \"${process.cwd()}${"\\node_modules\\date-fns\\format.cjs".split("\\").join(ospath.sep)}";`,
       ].join("\n").replaceAll("\\","\\\\"));
   });
 });
